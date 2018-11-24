@@ -10,3 +10,10 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# Vendor, binaries, etc
+.idea/
+.vscode/
+vendor/
+debug
+opengapps-mirror-bot
