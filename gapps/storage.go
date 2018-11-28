@@ -11,7 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-const notFoundErr = "package not found"
+// CurrentStorageKey is used as GlobalStorage key for the current package
+const CurrentStorageKey = "current"
 
 // Storage describes a package storage
 type Storage struct {
@@ -23,26 +24,42 @@ type Storage struct {
 }
 
 // GetPackageStorage creates and fills a new Storage
-func GetPackageStorage(client *github.Client) (*Storage, error) {
+func GetPackageStorage(ghClient *github.Client, releaseTag string) (*Storage, error) {
+	var (
+		release *github.RepositoryRelease
+		resp    *github.Response
+		err     error
+	)
 	storage := &Storage{
 		packages: make(map[Platform]map[Android]map[Variant]*Package, len(PlatformValues())),
 	}
+	if releaseTag == "" {
+		releaseTag = CurrentStorageKey
+	}
 
 	for _, platform := range PlatformValues() {
-		releases, resp, err := client.Repositories.GetLatestRelease(context.Background(), "opengapps", platform.String())
+		if releaseTag == CurrentStorageKey {
+			release, resp, err = ghClient.Repositories.GetLatestRelease(context.Background(), "opengapps", platform.String())
+		} else {
+			release, resp, err = ghClient.Repositories.GetReleaseByTag(context.Background(), "opengapps", platform.String(), releaseTag)
+		}
+
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			log.Fatal(resp.Status)
+			log.Println(resp.Status)
+			resp.Body.Close()
+			continue
 		}
 		resp.Body.Close()
 
-		zipSlice := make([]github.ReleaseAsset, 0, len(releases.Assets))
-		md5Slice := make([]github.ReleaseAsset, 0, len(releases.Assets))
+		zipSlice := make([]github.ReleaseAsset, 0, len(release.Assets))
+		md5Slice := make([]github.ReleaseAsset, 0, len(release.Assets))
 
 		// Sort out zip and MD5's
-		for _, asset := range releases.Assets {
+		for _, asset := range release.Assets {
 			name := asset.GetName()
 			if strings.HasSuffix(name, "zip") {
 				zipSlice = append(zipSlice, asset)
@@ -64,7 +81,7 @@ func GetPackageStorage(client *github.Client) (*Storage, error) {
 					log.Printf("Unable to get package: %v", err)
 					return
 				}
-				storage.AddPackage(p)
+				storage.Add(p)
 			}(&wg, i)
 		}
 		wg.Wait()
@@ -73,8 +90,8 @@ func GetPackageStorage(client *github.Client) (*Storage, error) {
 	return storage, nil
 }
 
-// AddPackage safely adds a new package to the Storage
-func (s *Storage) AddPackage(p *Package) {
+// Add safely adds a new package to the Storage
+func (s *Storage) Add(p *Package) {
 	s.mtx.Lock()
 	if s.packages[p.Platform] == nil {
 		s.packages[p.Platform] = make(map[Android]map[Variant]*Package, len(AndroidValues()))
@@ -92,21 +109,31 @@ func (s *Storage) AddPackage(p *Package) {
 	s.mtx.Unlock()
 }
 
-// GetPackage safely gets a new package from the Storage
-func (s *Storage) GetPackage(p Platform, a Android, v Variant) (*Package, error) {
+// Get safely gets a package from the Storage
+func (s *Storage) Get(p Platform, a Android, v Variant) (*Package, bool) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
 	if s.packages[p] == nil || s.packages[p][a] == nil {
-		return nil, errors.New(notFoundErr)
+		return nil, false
 	}
 
 	result, ok := s.packages[p][a][v]
-	if !ok {
-		return nil, errors.New(notFoundErr)
+	return result, ok
+}
+
+// Delete safely deletes a package from the Storage (if it's there)
+func (s *Storage) Delete(p *Package) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	if s.packages[p.Platform] == nil || s.packages[p.Platform][p.Android] == nil {
+		return
 	}
 
-	return result, nil
+	if _, ok := s.packages[p.Platform][p.Android][p.Variant]; ok {
+		delete(s.packages[p.Platform][p.Android], p.Variant)
+	}
 }
 
 // Clear cleanes the Storage to be used as new later
@@ -116,4 +143,57 @@ func (s *Storage) Clear() {
 	s.Count = 0
 	s.Date = ""
 	s.mtx.Unlock()
+}
+
+// GlobalStorage stores all the available storages
+type GlobalStorage struct {
+	storages map[string]*Storage
+	mtx      sync.RWMutex
+}
+
+// NewGlobalStorage creates a new GlobalStorage instance
+func NewGlobalStorage() *GlobalStorage {
+	return &GlobalStorage{
+		storages: make(map[string]*Storage),
+	}
+}
+
+// Init fills the GlobalStorage with the new Storage for the current release
+func (gs *GlobalStorage) Init(ghClient *github.Client) error {
+	gs.Clear()
+	s, err := GetPackageStorage(ghClient, CurrentStorageKey)
+	if err != nil {
+		return errors.Wrap(err, "unable to get current package storage")
+	}
+
+	gs.Add(CurrentStorageKey, s)
+	gs.Add(s.Date, s)
+	return nil
+}
+
+// Add safely adds a new Storage to the storages
+func (gs *GlobalStorage) Add(date string, s *Storage) {
+	gs.mtx.Lock()
+	if date == "" {
+		date = CurrentStorageKey
+	}
+	gs.storages[date] = s
+	gs.mtx.Unlock()
+}
+
+// Get safely gets a Storage from the storages
+func (gs *GlobalStorage) Get(date string) (*Storage, bool) {
+	gs.mtx.RLock()
+	defer gs.mtx.RUnlock()
+	s, ok := gs.storages[date]
+	return s, ok
+}
+
+// Clear cleanes the GlobalStorage to be used as new later
+func (gs *GlobalStorage) Clear() {
+	gs.mtx.Lock()
+	for k := range gs.storages {
+		delete(gs.storages, k)
+	}
+	gs.mtx.Unlock()
 }
