@@ -2,7 +2,6 @@ package gapps
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -10,10 +9,13 @@ import (
 	"time"
 
 	"github.com/google/go-github/v19/github"
+	"github.com/nezorflame/opengapps-mirror-bot/utils"
 	"github.com/pkg/errors"
 )
 
 const (
+	TimeFormat = "20060102"
+
 	parsingErrText = "parsing error"
 	gappsPrefix    = "open_gapps"
 	gappsSeparator = "-"
@@ -40,43 +42,35 @@ func (p *Package) CreateMirror() error {
 	}
 
 	// download the file
-	resp, err := http.DefaultClient.Get(p.OriginURL)
-	if err != nil {
-		return errors.Wrap(err, "unable to download the file")
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := utils.Download(p.OriginURL, 20, p.Size)
 	if err != nil {
 		return errors.Wrap(err, "unable to read file body")
 	}
 
 	// create temp file to store the contents
-	tmpfile, err := ioutil.TempFile("", "*")
+	tmpFileName, err := utils.CreateFile("", body, true)
 	if err != nil {
 		return errors.Wrap(err, "unable to create temp file")
 	}
-	defer func() {
-		_ = tmpfile.Close()
-		_ = os.Remove(tmpfile.Name())
-	}()
+	defer os.Remove(tmpFileName)
+	body = nil
 
-	if _, err = io.Copy(tmpfile, resp.Body); err != nil {
-		return errors.Wrap(err, "unable to write body to temp file")
+	// save the file on disk if possible
+	tmpFile, err := os.Open(tmpFileName)
+	if err != nil {
+		return errors.Wrap(err, "unable to open temp file")
 	}
+	defer tmpFile.Close()
 
-	fileType := http.DetectContentType(body)
-	resp.Body.Close()
-
-	// send the form
-	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(uploadURL, p.Name), tmpfile)
+	// send the file
+	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(uploadURL, p.Name), tmpFile)
 	if err != nil {
 		return errors.Wrap(err, "unable to create upload request")
 	}
-	req.Header.Set("Content-Type", fileType)
+	req.Header.Set("Content-Type", "application/zip")
 	req.Header.Set("Max-Days", "7")
 
-	resp, err = http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "unable to make upload request")
 	}
@@ -131,6 +125,15 @@ func formPackage(zipAsset, md5Asset github.ReleaseAsset) (*Package, error) {
 	}
 
 	return p, nil
+}
+
+func getMD5(url string) (string, error) {
+	body, err := utils.Download(url, 1, 0)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Split(string(body), "  ")[0], nil
 }
 
 // Package name format is as follows:

@@ -18,7 +18,6 @@ const (
 	dateErrMsg       = "Please provide the proper date (in the format `YYYYMMDD`)"
 	mirrorErrMsg     = "Please provide the platform, Android version, package variant and date of the release (optional)."
 	notFoundMsg      = "Sorry, there's no such package available. Please try another one.\nUse /help for more info."
-	foundMsg         = "Package %s was found. Checking if the mirror is present..."
 	mirrorMissingMsg = "There's no mirror yet, uploading..."
 	mirrorMsg        = "Here's your mirror: %s\nMD5 checksum: %s\nOriginal package URL: %s"
 	mirrorFailMsg    = "Sorry, I was unable to create a mirror.\nHere's your package original URL: %s\nMD5 checksum: %s"

@@ -18,6 +18,13 @@ var (
 	botTimeout = 60
 )
 
+type tgbot struct {
+	token   string
+	timeout int
+
+	*tgbotapi.BotAPI
+}
+
 func main() {
 	log.Println("Starting the bot")
 	ghClient := github.NewClient(nil)
@@ -26,12 +33,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	bot, err := tgbotapi.NewBotAPI(botToken)
+	bot := &tgbot{token: botToken, timeout: botTimeout}
+	b, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// bot.Debug = true
+	bot.BotAPI = b
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
 	update := tgbotapi.NewUpdate(0)
@@ -39,68 +46,87 @@ func main() {
 	updates := bot.GetUpdatesChan(update)
 
 	for u := range updates {
-		if u.Message == nil || !strings.HasPrefix(u.Message.Text, mirrorCmd) { // ignore any non-Message Updates
+		msg := u.Message
+		if u.Message == nil { // ignore any non-Message Updates
 			continue
 		}
-		log.Printf("[%s] %s", u.Message.From.UserName, u.Message.Text)
-
-		text := strings.TrimPrefix(u.Message.Text, mirrorCmd+" ")
-		if text == "" {
-			sendReply(bot, u.Message.Chat.ID, u.Message.MessageID, mirrorErrMsg)
-			continue
+		switch {
+		case strings.HasPrefix(u.Message.Text, mirrorCmd):
+			bot.mirror(globalStorage, ghClient, u.Message)
+		case strings.HasPrefix(msg.Text, helpCmd):
 		}
-
-		platform, android, variant, date, err := parseCmd(text)
-		if err != nil {
-			errMsg := err.Error()
-			switch {
-			case strings.Contains(errMsg, platformErrText):
-				errMsg = platformErrMsg
-			case strings.Contains(errMsg, androidErrText):
-				errMsg = androidErrMsg
-			case strings.Contains(errMsg, variantErrText):
-				errMsg = variantErrMsg
-			case strings.Contains(errMsg, dateErrText):
-				errMsg = dateErrMsg
-			default:
-				errMsg = unknownErrMsg
-			}
-
-			sendReply(bot, u.Message.Chat.ID, u.Message.MessageID, errMsg)
-			continue
-		}
-
-		s, ok := globalStorage.Get(date)
-		if !ok {
-			sendReply(bot, u.Message.Chat.ID, u.Message.MessageID, inProgressMsg)
-
-			var err error
-			if s, err = gapps.GetPackageStorage(ghClient, date); err != nil {
-				sendReply(bot, u.Message.Chat.ID, u.Message.MessageID, unknownErrMsg)
-				log.Fatal("No current storage available")
-			}
-
-			globalStorage.Add(s.Date, s)
-		}
-		log.Printf("Got %d packages for release date %s", s.Count, s.Date)
-
-		pkg, ok := s.Get(platform, android, variant)
-		if !ok {
-			sendReply(bot, u.Message.Chat.ID, u.Message.MessageID, notFoundMsg)
-			continue
-		}
-
-		sendReply(bot, u.Message.Chat.ID, 0, fmt.Sprintf(foundMsg, pkg.Name))
-
-		if pkg.MirrorURL == "" {
-			sendReply(bot, u.Message.Chat.ID, 0, mirrorMissingMsg)
-			if err := pkg.CreateMirror(); err != nil {
-				sendReply(bot, u.Message.Chat.ID, u.Message.MessageID, fmt.Sprintf(mirrorFailMsg, pkg.OriginURL, pkg.MD5))
-				continue
-			}
-		}
-		sendReply(bot, u.Message.Chat.ID, u.Message.MessageID, fmt.Sprintf(mirrorMsg, pkg.MirrorURL, pkg.MD5, pkg.OriginURL))
 	}
+}
+
+func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tgbotapi.Message) {
+	text := strings.TrimPrefix(msg.Text, mirrorCmd+" ")
+	if text == "" {
+		b.reply(msg.Chat.ID, msg.MessageID, mirrorErrMsg)
+		return
+	}
+
+	platform, android, variant, date, err := parseCmd(text)
+	if err != nil {
+		errMsg := err.Error()
+		switch {
+		case strings.Contains(errMsg, platformErrText):
+			errMsg = platformErrMsg
+		case strings.Contains(errMsg, androidErrText):
+			errMsg = androidErrMsg
+		case strings.Contains(errMsg, variantErrText):
+			errMsg = variantErrMsg
+		case strings.Contains(errMsg, dateErrText):
+			errMsg = dateErrMsg
+		default:
+			errMsg = unknownErrMsg
+		}
+
+		b.reply(msg.Chat.ID, msg.MessageID, errMsg)
+		return
+	}
+
+	s, ok := gs.Get(date)
+	if !ok {
+		b.reply(msg.Chat.ID, msg.MessageID, inProgressMsg)
+
+		var err error
+		if s, err = gapps.GetPackageStorage(ghClient, date); err != nil {
+			b.reply(msg.Chat.ID, msg.MessageID, unknownErrMsg)
+			log.Fatal("No current storage available")
+		}
+
+		gs.Add(s.Date, s)
+	}
+	log.Printf("Got %d packages for release date %s", s.Count, s.Date)
+
+	pkg, ok := s.Get(platform, android, variant)
+	if !ok {
+		b.reply(msg.Chat.ID, msg.MessageID, notFoundMsg)
+		return
+	}
+
+	if pkg.MirrorURL == "" {
+		b.reply(msg.Chat.ID, 0, mirrorMissingMsg)
+		if err := pkg.CreateMirror(); err != nil {
+			log.Printf("Unable to create mirror: %v", err)
+			b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(mirrorFailMsg, pkg.OriginURL, pkg.MD5))
+			return
+		}
+	}
+	b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(mirrorMsg, pkg.MirrorURL, pkg.MD5, pkg.OriginURL))
+}
+
+func (b *tgbot) reply(chatID int64, msgID int, text string) {
+	msg := tgbotapi.NewMessage(chatID, text)
+	if msgID != 0 {
+		msg.ReplyToMessageID = msgID
+	}
+
+	if _, err := b.Send(msg); err != nil {
+		log.Printf("Unable to send the message: %v", err)
+		return
+	}
+	log.Println(text)
 }
 
 func parseCmd(cmd string) (platform gapps.Platform, android gapps.Android, variant gapps.Variant, date string, err error) {
@@ -122,17 +148,4 @@ func parseCmd(cmd string) (platform gapps.Platform, android gapps.Android, varia
 		err = errors.Errorf("bad command format '%s'", cmd)
 	}
 	return
-}
-
-func sendReply(bot *tgbotapi.BotAPI, chatID int64, msgID int, text string) {
-	msg := tgbotapi.NewMessage(chatID, text)
-	if msgID != 0 {
-		msg.ReplyToMessageID = msgID
-	}
-
-	if _, err := bot.Send(msg); err != nil {
-		log.Printf("Unable to send the message: %v", err)
-		return
-	}
-	log.Println(text)
 }
