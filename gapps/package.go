@@ -52,7 +52,7 @@ func (p *Package) CreateMirror(cfg *config.Config) error {
 		if filePath, err = p.move(filePath, cfg.GAppsLocalPath); err != nil {
 			return errors.Wrap(err, "unable to move the file to storage")
 		}
-		log.Printf("Package moved to to %s", filePath)
+		log.Printf("Package moved to %s", filePath)
 
 		// if we have cfg.GAppsLocalURL set, provide the local server URL
 		if cfg.GAppsLocalURL != "" {
