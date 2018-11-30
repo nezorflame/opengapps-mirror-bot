@@ -98,7 +98,7 @@ func (p *Package) CreateMirror(cfg *config.Config) error {
 }
 
 func (p *Package) move(origin, destFolder string) (string, error) {
-	path := fmt.Sprintf("%s/%s/%s", destFolder, p.Variant, p.Date)
+	path := fmt.Sprintf("%s/%s/%s", destFolder, p.Platform, p.Date)
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", errors.Wrap(err, "unable to create folder")
 	}
@@ -106,6 +106,10 @@ func (p *Package) move(origin, destFolder string) (string, error) {
 	path += "/" + p.Name
 	if err := os.Rename(origin, path); err != nil {
 		return "", errors.Wrap(err, "unable to move file")
+	}
+
+	if err := os.Chmod(path, 0755); err != nil {
+		return "", errors.Wrap(err, "unable to set file permissions")
 	}
 
 	return path, nil
