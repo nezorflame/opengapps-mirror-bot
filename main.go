@@ -138,6 +138,17 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		return
 	}
 
+	if pkg.LocalURL == "" && pkg.RemoteURL == "" {
+		b.reply(msg.Chat.ID, 0, b.cfg.MsgMirrorMissing)
+		log.Printf("Creating a mirror for the package %s", pkg.Name)
+		if err := pkg.CreateMirror(b.cfg); err != nil {
+			log.Printf("Unable to create mirror: %v", err)
+			b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(b.cfg.MsgMirrorFail, pkg.OriginURL, pkg.MD5))
+			return
+		}
+	}
+
+	log.Printf("Got the mirror for the package %s", pkg.Name)
 	mirrorResult := ""
 	if pkg.LocalURL != "" {
 		mirrorResult = fmt.Sprintf(mirrorFormat, b.cfg.GAppsLocalHostname, pkg.LocalURL)
@@ -149,14 +160,6 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		mirrorResult += fmt.Sprintf(mirrorFormat, b.cfg.GAppsRemoteHostname, pkg.RemoteURL)
 	}
 
-	if mirrorResult == "" {
-		b.reply(msg.Chat.ID, 0, b.cfg.MsgMirrorMissing)
-		if err := pkg.CreateMirror(b.cfg); err != nil {
-			log.Printf("Unable to create mirror: %v", err)
-			b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(b.cfg.MsgMirrorFail, pkg.OriginURL, pkg.MD5))
-			return
-		}
-	}
 	log.Println(mirrorResult)
 	b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(b.cfg.MsgMirrorOK, mirrorResult, pkg.MD5, pkg.OriginURL))
 	log.Printf("Sent mirror for pkg %s", pkg.Name)
