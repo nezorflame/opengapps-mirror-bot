@@ -1,0 +1,37 @@
+tracing = false
+debug = false
+
+[gapps]
+time_format = "20060102"
+prefix = "open_gapps"
+local_path = "/path/to/gapps/mirror/storage/"
+local_url = "https://your.web.server/%s"
+local_host = "your.web.server"
+remote_url = "https://remote.web.server/%s"
+remote_host = "remote.web.server"
+
+[github]
+repo = "opengapps"
+token = "your_github_token"
+
+[telegram]
+token = "YOUR:TELEGRAMBOTTOKEN"
+timeout = 60
+
+[messages]
+help = "Possible /mirror command arguments:\n- platform: `arm`|`arm64`|`x86`|`x86_64`\n- Android version: `4.4`...`9.0`\n- package variant: `pico`|`nano`|`micro`|`mini`|`full`|`stock`|`super`|`aroma`|`tvstock`\n- _(optional)_ date of the release: `YYYYMMDD`\n\nCheck the official [wiki](https://github.com/opengapps/opengapps/wiki) for more info.\n\nExamples:\n  `/mirror arm64 9.0 nano`\n  `/mirror arm 8.1 aroma 20181127`"
+
+    [messages.mirror]
+    in_progress = "Looking up the package, please wait..."
+    not_found = "Sorry, there's no such package available. Please try another one.\nUse /help for more info."
+    missing = "There's no mirror yet, uploading..."
+    ok = "Here's your mirror: [%s](%s)\nMD5 checksum: `%s`\nOriginal package URL: [Github](%s)"
+    fail = "Sorry, I was unable to create a mirror.\nHere's your package original URL: %s\nMD5 checksum: %s"
+
+    [messages.errors]
+    platform = "Please provide the proper platform (use /help for more info)"
+    android = "Please provide the proper Android version (use /help for more info)"
+    variant = "Please provide the proper package variant (use /help for more info)"
+    date = "Please provide the proper date (use /help for more info)"
+    mirror = "Please provide the platform, Android version, package variant and date of the release (optional)."
+    unknown = "Oops! Something happened. Please contact the developer."

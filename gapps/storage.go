@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/google/go-github/v19/github"
+	"github.com/nezorflame/opengapps-mirror-bot/config"
 	"github.com/pkg/errors"
 )
 
@@ -24,7 +25,7 @@ type Storage struct {
 }
 
 // GetPackageStorage creates and fills a new Storage
-func GetPackageStorage(ghClient *github.Client, releaseTag string) (*Storage, error) {
+func GetPackageStorage(ghClient *github.Client, cfg *config.Config, releaseTag string) (*Storage, error) {
 	var (
 		release *github.RepositoryRelease
 		resp    *github.Response
@@ -39,9 +40,9 @@ func GetPackageStorage(ghClient *github.Client, releaseTag string) (*Storage, er
 
 	for _, platform := range PlatformValues() {
 		if releaseTag == CurrentStorageKey {
-			release, resp, err = ghClient.Repositories.GetLatestRelease(context.Background(), "opengapps", platform.String())
+			release, resp, err = ghClient.Repositories.GetLatestRelease(context.Background(), cfg.GithubRepo, platform.String())
 		} else {
-			release, resp, err = ghClient.Repositories.GetReleaseByTag(context.Background(), "opengapps", platform.String(), releaseTag)
+			release, resp, err = ghClient.Repositories.GetReleaseByTag(context.Background(), cfg.GithubRepo, platform.String(), releaseTag)
 		}
 
 		if err != nil {
@@ -76,7 +77,7 @@ func GetPackageStorage(ghClient *github.Client, releaseTag string) (*Storage, er
 		for i := 0; i < len(zipSlice); i++ {
 			go func(wg *sync.WaitGroup, i int) {
 				defer wg.Done()
-				p, err := formPackage(zipSlice[i], md5Slice[i])
+				p, err := formPackage(cfg, zipSlice[i], md5Slice[i])
 				if err != nil {
 					log.Printf("Unable to get package: %v", err)
 					return
@@ -159,9 +160,9 @@ func NewGlobalStorage() *GlobalStorage {
 }
 
 // Init fills the GlobalStorage with the new Storage for the current release
-func (gs *GlobalStorage) Init(ghClient *github.Client) error {
+func (gs *GlobalStorage) Init(ghClient *github.Client, cfg *config.Config) error {
 	gs.Clear()
-	s, err := GetPackageStorage(ghClient, CurrentStorageKey)
+	s, err := GetPackageStorage(ghClient, cfg, CurrentStorageKey)
 	if err != nil {
 		return errors.Wrap(err, "unable to get current package storage")
 	}

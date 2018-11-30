@@ -27,7 +27,7 @@ const (
 	Android90
 )
 
-// Variant is an enum for different Android versions
+// Variant is an enum for different package variations
 type Variant uint
 
 // Variant consts

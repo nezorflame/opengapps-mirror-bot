@@ -11,10 +11,11 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Vendor, binaries, etc
+# Vendor, config, binaries, etc
 .idea/
 .vscode/
 vendor/
+config.toml
 debug
 opengapps-mirror-bot
 .DS_Store
