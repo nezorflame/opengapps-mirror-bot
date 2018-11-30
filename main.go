@@ -157,8 +157,9 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 			return
 		}
 	}
+	log.Println(mirrorResult)
 	b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(b.cfg.MsgMirrorOK, mirrorResult, pkg.MD5, pkg.OriginURL))
-	log.Printf("Sent mirror for pkg %s: local %s, remote %s", pkg.Name, pkg.LocalURL, pkg.RemoteURL)
+	log.Printf("Sent mirror for pkg %s", pkg.Name)
 }
 
 func (b *tgbot) help(msg *tgbotapi.Message) {

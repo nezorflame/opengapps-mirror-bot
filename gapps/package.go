@@ -3,6 +3,7 @@ package gapps
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -44,20 +45,24 @@ func (p *Package) CreateMirror(cfg *config.Config) error {
 	if err != nil {
 		return errors.Wrap(err, "unable to read file body")
 	}
+	log.Printf("Package downloaded to %s", filePath)
 
 	// if we have cfg.GAppsLocalPath set, save the file there
 	if cfg.GAppsLocalPath != "" {
 		if filePath, err = p.move(filePath, cfg.GAppsLocalPath); err != nil {
 			return errors.Wrap(err, "unable to move the file to storage")
 		}
+		log.Printf("Package moved to to %s", filePath)
 
 		// if we have cfg.GAppsLocalURL set, provide the local server URL
 		if cfg.GAppsLocalURL != "" {
 			relPath := strings.TrimPrefix(filePath, cfg.GAppsLocalPath)
 			p.LocalURL = fmt.Sprintf(cfg.GAppsLocalURL, relPath)
+			log.Printf("Local URL is %s", p.LocalURL)
 		}
 	} else {
 		// delete the file in the end otherwise
+		log.Println("Temp file will be deleted")
 		defer os.Remove(filePath)
 	}
 
@@ -92,6 +97,7 @@ func (p *Package) CreateMirror(cfg *config.Config) error {
 		}
 
 		p.RemoteURL = string(result)
+		log.Printf("File uploaded, remote URL is %s", p.RemoteURL)
 	}
 
 	return nil
