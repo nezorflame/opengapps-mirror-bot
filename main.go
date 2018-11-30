@@ -105,6 +105,7 @@ func (b *tgbot) help(msg *tgbotapi.Message) {
 }
 
 func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tgbotapi.Message) {
+	// parse the message
 	cmd := strings.Replace(msg.Text, ".", "", -1)
 	parts := strings.Split(cmd, " ")
 	if len(parts) < 2 {
@@ -132,6 +133,7 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		return
 	}
 
+	// look up the package storage
 	s, ok := gs.Get(date)
 	if !ok {
 		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorInProgress)
@@ -144,20 +146,28 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 
 		gs.Add(s.Date, s)
 	}
+
+	// look up the package
 	pkg, ok := s.Get(platform, android, variant)
 	if !ok {
 		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorNotFound)
 		return
 	}
 
+	// check if we already have mirrors
+	text := ""
 	if pkg.LocalURL == "" && pkg.RemoteURL == "" {
-		b.reply(msg.Chat.ID, 0, b.cfg.MsgMirrorMissing)
+		text = fmt.Sprintf(b.cfg.MsgMirrorFound, pkg.Name, pkg.OriginURL, pkg.MD5, b.cfg.MsgMirrorMissing)
+		b.reply(msg.Chat.ID, 0, text)
 		log.Printf("Creating a mirror for the package %s", pkg.Name)
 		if err := pkg.CreateMirror(b.cfg); err != nil {
 			log.Printf("Unable to create mirror: %v", err)
-			b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(b.cfg.MsgMirrorFail, pkg.OriginURL, pkg.MD5))
+			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorFail)
 			return
 		}
+		text = b.cfg.MsgMirrorOK
+	} else {
+		text = fmt.Sprintf(b.cfg.MsgMirrorFound, pkg.Name, pkg.OriginURL, pkg.MD5, b.cfg.MsgMirrorOK)
 	}
 
 	log.Printf("Got the mirror for the package %s", pkg.Name)
@@ -172,7 +182,7 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		mirrorResult += fmt.Sprintf(mirrorFormat, b.cfg.GAppsRemoteHostname, pkg.RemoteURL)
 	}
 
-	b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(b.cfg.MsgMirrorOK, mirrorResult, pkg.MD5, pkg.OriginURL))
+	b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(text, mirrorResult))
 	log.Printf("Sent mirror for pkg %s", pkg.Name)
 }
 

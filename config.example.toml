@@ -24,10 +24,11 @@ help = "Possible /mirror command arguments:\n- platform: `arm`|`arm64`|`x86`|`x8
 
     [messages.mirror]
     in_progress = "Looking up the package, please wait..."
+    found = "Found the package `%s`\nOfficial link: [Github](%s)\nMD5 checksum: `%s`\n\n%s"
     not_found = "Sorry, there's no such package available. Please try another one.\nUse /help for more info."
     missing = "There's no mirror yet, uploading..."
-    ok = "Here's your mirror: [%s](%s)\nMD5 checksum: `%s`\nOriginal package URL: [Github](%s)"
-    fail = "Sorry, I was unable to create a mirror.\nHere's your package original URL: %s\nMD5 checksum: %s"
+    ok = "Here're your mirrors: %s"
+    fail = "Sorry, I was unable to create a mirror.\nPlease try again later.\nUse /help for more info."
 
     [messages.errors]
     platform = "Please provide the proper platform (use /help for more info)"

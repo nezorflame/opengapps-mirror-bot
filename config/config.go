@@ -29,6 +29,7 @@ type Config struct {
 	MsgHello            string
 	MsgHelp             string
 	MsgMirrorInProgress string
+	MsgMirrorFound      string
 	MsgMirrorNotFound   string
 	MsgMirrorMissing    string
 	MsgMirrorOK         string
@@ -122,6 +123,9 @@ func Init(name string) (*Config, error) {
 	mirrorSection := msgSection.Sub("mirror")
 	if c.MsgMirrorInProgress = mirrorSection.GetString("in_progress"); c.MsgMirrorInProgress == "" {
 		return nil, errors.Errorf(emptyErr, "messages.mirror.in_progress")
+	}
+	if c.MsgMirrorFound = mirrorSection.GetString("found"); c.MsgMirrorFound == "" {
+		return nil, errors.Errorf(emptyErr, "messages.mirror.found")
 	}
 	if c.MsgMirrorNotFound = mirrorSection.GetString("not_found"); c.MsgMirrorNotFound == "" {
 		return nil, errors.Errorf(emptyErr, "messages.mirror.not_found")
