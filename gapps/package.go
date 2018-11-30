@@ -104,7 +104,7 @@ func (p *Package) CreateMirror(cfg *config.Config) error {
 }
 
 func (p *Package) move(origin, destFolder string) (string, error) {
-	path := fmt.Sprintf("%s/%s/%s", destFolder, p.Platform, p.Date)
+	path := destFolder + p.Platform.String() + "/" + p.Date
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", errors.Wrap(err, "unable to create folder")
 	}
