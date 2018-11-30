@@ -105,13 +105,14 @@ func (b *tgbot) help(msg *tgbotapi.Message) {
 }
 
 func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tgbotapi.Message) {
-	text := strings.TrimPrefix(msg.Text, mirrorCmd+" ")
-	if text == "" {
+	cmd := strings.Replace(msg.Text, ".", "", -1)
+	parts := strings.Split(cmd, " ")
+	if len(parts) < 2 {
 		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgErrMirror)
 		return
 	}
 
-	platform, android, variant, date, err := parseCmd(text, b.cfg.GAppsTimeFormat)
+	platform, android, variant, date, err := parseCmd(parts[1:], b.cfg.GAppsTimeFormat)
 	if err != nil {
 		errMsg := err.Error()
 		switch {
@@ -171,7 +172,6 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		mirrorResult += fmt.Sprintf(mirrorFormat, b.cfg.GAppsRemoteHostname, pkg.RemoteURL)
 	}
 
-	log.Println(mirrorResult)
 	b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(b.cfg.MsgMirrorOK, mirrorResult, pkg.MD5, pkg.OriginURL))
 	log.Printf("Sent mirror for pkg %s", pkg.Name)
 }
@@ -189,9 +189,7 @@ func (b *tgbot) reply(chatID int64, msgID int, text string) {
 	}
 }
 
-func parseCmd(cmd, timeFormat string) (platform gapps.Platform, android gapps.Android, variant gapps.Variant, date string, err error) {
-	cmd = strings.Replace(cmd, ".", "", -1)
-	parts := strings.Split(cmd, " ")
+func parseCmd(parts []string, timeFormat string) (platform gapps.Platform, android gapps.Android, variant gapps.Variant, date string, err error) {
 	date = "current"
 	switch len(parts) {
 	case 4:
@@ -206,7 +204,7 @@ func parseCmd(cmd, timeFormat string) (platform gapps.Platform, android gapps.An
 			return
 		}
 	default:
-		err = errors.Errorf("bad command format '%s'", cmd)
+		err = errors.New("bad command format")
 	}
 	return
 }
