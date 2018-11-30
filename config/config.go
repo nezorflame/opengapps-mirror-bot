@@ -26,6 +26,7 @@ type Config struct {
 	TelegramToken   string
 	TelegramTimeout int
 
+	MsgHello            string
 	MsgHelp             string
 	MsgMirrorInProgress string
 	MsgMirrorNotFound   string
@@ -111,6 +112,9 @@ func Init(name string) (*Config, error) {
 	}
 
 	msgSection := viper.Sub("messages")
+	if c.MsgHello = msgSection.GetString("hello"); c.MsgHello == "" {
+		return nil, errors.Errorf(emptyErr, "messages.hello")
+	}
 	if c.MsgHelp = msgSection.GetString("help"); c.MsgHelp == "" {
 		return nil, errors.Errorf(emptyErr, "messages.help")
 	}

@@ -19,6 +19,7 @@ token = "YOUR:TELEGRAMBOTTOKEN"
 timeout = 60
 
 [messages]
+hello = "Greetings, my friend!\nPlease use the /mirror command to get the OpenGApps package mirror.\nUse /help command if you need any assistance.\nFor any questions, feel free to contact the admin."
 help = "Possible /mirror command arguments:\n- platform: `arm`|`arm64`|`x86`|`x86_64`\n- Android version: `4.4`...`9.0`\n- package variant: `pico`|`nano`|`micro`|`mini`|`full`|`stock`|`super`|`aroma`|`tvstock`\n- _(optional)_ date of the release: `YYYYMMDD`\n\nCheck the official [wiki](https://github.com/opengapps/opengapps/wiki) for more info.\n\nExamples:\n  `/mirror arm64 9.0 nano`\n  `/mirror arm 8.1 aroma 20181127`"
 
     [messages.mirror]

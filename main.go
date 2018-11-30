@@ -23,6 +23,7 @@ const (
 	androidErrText  = "does not belong to Android values"
 	variantErrText  = "does not belong to Variant values"
 	dateErrText     = "unable to parse time"
+	startCmd        = "/start"
 	mirrorCmd       = "/mirror"
 	helpCmd         = "/help"
 	mirrorFormat    = "[%s](%s)"
@@ -58,7 +59,7 @@ func main() {
 	ghClient := github.NewClient(tc)
 
 	globalStorage := gapps.NewGlobalStorage()
-	if err := globalStorage.Init(ghClient, cfg); err != nil {
+	if err = globalStorage.Init(ghClient, cfg); err != nil {
 		log.Fatal(err)
 	}
 
@@ -85,12 +86,22 @@ func main() {
 			continue
 		}
 		switch {
-		case strings.HasPrefix(u.Message.Text, mirrorCmd):
-			go bot.mirror(globalStorage, ghClient, u.Message)
+		case strings.HasPrefix(u.Message.Text, startCmd):
+			go bot.hello(u.Message)
 		case strings.HasPrefix(u.Message.Text, helpCmd):
 			go bot.help(u.Message)
+		case strings.HasPrefix(u.Message.Text, mirrorCmd):
+			go bot.mirror(globalStorage, ghClient, u.Message)
 		}
 	}
+}
+
+func (b *tgbot) hello(msg *tgbotapi.Message) {
+	b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgHello)
+}
+
+func (b *tgbot) help(msg *tgbotapi.Message) {
+	b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgHelp)
 }
 
 func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tgbotapi.Message) {
@@ -165,10 +176,6 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 	log.Printf("Sent mirror for pkg %s", pkg.Name)
 }
 
-func (b *tgbot) help(msg *tgbotapi.Message) {
-	b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgHelp)
-}
-
 func (b *tgbot) reply(chatID int64, msgID int, text string) {
 	msg := tgbotapi.NewMessage(chatID, fmt.Sprintf(text))
 	if msgID != 0 {
@@ -190,6 +197,7 @@ func parseCmd(cmd, timeFormat string) (platform gapps.Platform, android gapps.An
 	case 4:
 		if _, err = time.Parse(timeFormat, parts[3]); err != nil {
 			err = errors.Wrap(err, dateErrText)
+			return
 		}
 		date = parts[3]
 		fallthrough
