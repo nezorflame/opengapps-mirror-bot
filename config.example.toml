@@ -1,5 +1,6 @@
 tracing = false
 debug = false
+max_downloads = 10
 
 [gapps]
 time_format = "20060102"

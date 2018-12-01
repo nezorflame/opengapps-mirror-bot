@@ -14,8 +14,21 @@ import (
 	"github.com/pkg/errors"
 )
 
-// DownloadSingle downloads a file from URL in single thread
-func DownloadSingle(url string) (string, error) {
+// DownloadQueue is used to limit download process
+type DownloadQueue struct {
+	tokens chan struct{}
+}
+
+// NewQueue creates a new instance of DownloadQueue
+func NewQueue(maxCount uint) *DownloadQueue {
+	return &DownloadQueue{tokens: make(chan struct{}, maxCount)}
+}
+
+// AddSingle gets a file from URL in single thread
+func (dq *DownloadQueue) AddSingle(url string) (string, error) {
+	dq.acquire()
+	defer dq.release()
+
 	resp, err := http.DefaultClient.Get(url)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to make GET request")
@@ -30,8 +43,8 @@ func DownloadSingle(url string) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-// DownloadFile gets the file from URL in multiple threads
-func DownloadFile(url, md5sum string, limit, size int) (string, error) {
+// AddMultiple gets the file from URL in multiple threads
+func (dq *DownloadQueue) AddMultiple(url, md5sum string, limit, size int) (string, error) {
 	var (
 		result string
 		err    error
@@ -39,11 +52,11 @@ func DownloadFile(url, md5sum string, limit, size int) (string, error) {
 
 	switch {
 	case size > 0:
-		if result, err = downloadMulti(url, size, limit); err != nil {
+		if result, err = dq.multi(url, size, limit); err != nil {
 			return "", errors.New("unable to download the file")
 		}
 	case size == 0:
-		if result, err = DownloadSingle(url); err != nil {
+		if result, err = dq.AddSingle(url); err != nil {
 			return "", errors.New("unable to download the file")
 		}
 	default:
@@ -61,7 +74,10 @@ func DownloadFile(url, md5sum string, limit, size int) (string, error) {
 	return result, nil
 }
 
-func downloadMulti(url string, size, limit int) (string, error) {
+func (dq *DownloadQueue) multi(url string, size, limit int) (string, error) {
+	dq.acquire()
+	defer dq.release()
+
 	var wg sync.WaitGroup
 	wg.Add(limit)
 	lenSub, diff := size/limit, size%limit
@@ -103,6 +119,14 @@ func downloadMulti(url string, size, limit int) (string, error) {
 	}
 
 	return tmpFileName, nil
+}
+
+func (dq *DownloadQueue) acquire() {
+	dq.tokens <- struct{}{}
+}
+
+func (dq *DownloadQueue) release() {
+	<-dq.tokens
 }
 
 func createTmpFile(content io.Reader) (*os.File, error) {

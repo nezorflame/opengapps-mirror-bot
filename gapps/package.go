@@ -35,13 +35,13 @@ type Package struct {
 }
 
 // CreateMirror creates a new mirror for the package
-func (p *Package) CreateMirror(cfg *config.Config) error {
+func (p *Package) CreateMirror(dq *utils.DownloadQueue, cfg *config.Config) error {
 	if cfg.GAppsLocalURL != "" && p.LocalURL != "" || cfg.GAppsRemoteURL != "" && p.RemoteURL != "" {
 		return nil
 	}
 
 	// download the file
-	filePath, err := utils.DownloadFile(p.OriginURL, p.MD5, 20, p.Size)
+	filePath, err := dq.AddMultiple(p.OriginURL, p.MD5, 20, p.Size)
 	if err != nil {
 		return errors.Wrap(err, "unable to read file body")
 	}
@@ -145,8 +145,8 @@ func ParsePackageParts(args []string) (Platform, Android, Variant, error) {
 	return platform, android, variant, nil
 }
 
-func formPackage(cfg *config.Config, zipAsset, md5Asset github.ReleaseAsset) (*Package, error) {
-	md5sum, err := getMD5(md5Asset.GetBrowserDownloadURL())
+func formPackage(dq *utils.DownloadQueue, cfg *config.Config, zipAsset, md5Asset github.ReleaseAsset) (*Package, error) {
+	md5sum, err := getMD5(dq, md5Asset.GetBrowserDownloadURL())
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to download md5")
 	}
@@ -159,8 +159,8 @@ func formPackage(cfg *config.Config, zipAsset, md5Asset github.ReleaseAsset) (*P
 	return p, nil
 }
 
-func getMD5(url string) (string, error) {
-	filePath, err := utils.DownloadSingle(url)
+func getMD5(dq *utils.DownloadQueue, url string) (string, error) {
+	filePath, err := dq.AddSingle(url)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to download MD5 file")
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-github/v19/github"
 	"github.com/nezorflame/opengapps-mirror-bot/config"
+	"github.com/nezorflame/opengapps-mirror-bot/utils"
 	"github.com/pkg/errors"
 )
 
@@ -25,7 +26,7 @@ type Storage struct {
 }
 
 // GetPackageStorage creates and fills a new Storage
-func GetPackageStorage(ghClient *github.Client, cfg *config.Config, releaseTag string) (*Storage, error) {
+func GetPackageStorage(ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config, releaseTag string) (*Storage, error) {
 	var (
 		release *github.RepositoryRelease
 		resp    *github.Response
@@ -77,7 +78,7 @@ func GetPackageStorage(ghClient *github.Client, cfg *config.Config, releaseTag s
 		for i := 0; i < len(zipSlice); i++ {
 			go func(wg *sync.WaitGroup, i int) {
 				defer wg.Done()
-				p, err := formPackage(cfg, zipSlice[i], md5Slice[i])
+				p, err := formPackage(dq, cfg, zipSlice[i], md5Slice[i])
 				if err != nil {
 					log.Printf("Unable to get package: %v", err)
 					return
@@ -160,9 +161,9 @@ func NewGlobalStorage() *GlobalStorage {
 }
 
 // Init fills the GlobalStorage with the new Storage for the current release
-func (gs *GlobalStorage) Init(ghClient *github.Client, cfg *config.Config) error {
+func (gs *GlobalStorage) Init(ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config) error {
 	gs.Clear()
-	s, err := GetPackageStorage(ghClient, cfg, CurrentStorageKey)
+	s, err := GetPackageStorage(ghClient, dq, cfg, CurrentStorageKey)
 	if err != nil {
 		return errors.Wrap(err, "unable to get current package storage")
 	}

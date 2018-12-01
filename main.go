@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nezorflame/opengapps-mirror-bot/utils"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/go-github/v19/github"
 	"github.com/pkg/errors"
@@ -31,6 +33,7 @@ const (
 
 type tgbot struct {
 	cfg *config.Config
+	dq  *utils.DownloadQueue
 
 	*tgbotapi.BotAPI
 }
@@ -58,8 +61,10 @@ func main() {
 	tc := oauth2.NewClient(context.Background(), ts)
 	ghClient := github.NewClient(tc)
 
+	dq := utils.NewQueue(cfg.MaxDownloads)
+
 	globalStorage := gapps.NewGlobalStorage()
-	if err = globalStorage.Init(ghClient, cfg); err != nil {
+	if err = globalStorage.Init(ghClient, dq, cfg); err != nil {
 		log.Fatal(err)
 	}
 
@@ -73,8 +78,11 @@ func main() {
 		b.Debug = true
 	}
 
-	bot := &tgbot{cfg: cfg}
-	bot.BotAPI = b
+	bot := &tgbot{
+		BotAPI: b,
+		cfg:    cfg,
+		dq:     dq,
+	}
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
 	update := tgbotapi.NewUpdate(0)
@@ -139,7 +147,7 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorInProgress)
 
 		var err error
-		if s, err = gapps.GetPackageStorage(ghClient, b.cfg, date); err != nil {
+		if s, err = gapps.GetPackageStorage(ghClient, b.dq, b.cfg, date); err != nil {
 			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgErrUnknown)
 			log.Fatal("No current storage available")
 		}
@@ -160,7 +168,7 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		text = fmt.Sprintf(b.cfg.MsgMirrorFound, pkg.Name, pkg.OriginURL, pkg.MD5, b.cfg.MsgMirrorMissing)
 		b.reply(msg.Chat.ID, 0, text)
 		log.Printf("Creating a mirror for the package %s", pkg.Name)
-		if err := pkg.CreateMirror(b.cfg); err != nil {
+		if err := pkg.CreateMirror(b.dq, b.cfg); err != nil {
 			log.Printf("Unable to create mirror: %v", err)
 			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorFail)
 			return

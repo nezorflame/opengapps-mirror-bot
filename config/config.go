@@ -11,6 +11,7 @@ import (
 type Config struct {
 	EnableTracing bool
 	EnableDebug   bool
+	MaxDownloads  uint
 
 	GAppsTimeFormat     string
 	GAppsPrefix         string
@@ -62,6 +63,11 @@ func Init(name string) (*Config, error) {
 
 	c.EnableTracing = viper.GetBool("tracing")
 	c.EnableDebug = viper.GetBool("debug")
+	maxDownloads := viper.GetInt("max_downloads")
+	if maxDownloads <= 0 {
+		return nil, errors.Errorf(emptyErr, "max_downloads")
+	}
+	c.MaxDownloads = uint(maxDownloads)
 
 	gappsSection := viper.Sub("gapps")
 	if c.GAppsTimeFormat = gappsSection.GetString("time_format"); c.GAppsTimeFormat == "" {
