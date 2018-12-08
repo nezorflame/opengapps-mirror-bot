@@ -48,7 +48,7 @@ func main() {
 	flag.Parse()
 
 	// init logger
-	logConfig := zap.NewDevelopmentConfig()
+	logConfig := zap.NewProductionConfig()
 	logConfig.Level.SetLevel(*level)
 	logger, err := logConfig.Build()
 	if err != nil {
