@@ -1,6 +1,9 @@
 tracing = false
-debug = false
 max_downloads = 10
+
+[db]
+path = "./bolt.db"
+timeout = "1s"
 
 [gapps]
 time_format = "20060102"

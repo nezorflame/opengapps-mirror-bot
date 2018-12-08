@@ -3,16 +3,17 @@ package gapps
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v19/github"
-	"github.com/nezorflame/opengapps-mirror-bot/config"
-	"github.com/nezorflame/opengapps-mirror-bot/utils"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
+	"github.com/nezorflame/opengapps-mirror-bot/lib/config"
+	"github.com/nezorflame/opengapps-mirror-bot/lib/utils"
 )
 
 const (
@@ -35,7 +36,7 @@ type Package struct {
 }
 
 // CreateMirror creates a new mirror for the package
-func (p *Package) CreateMirror(dq *utils.DownloadQueue, cfg *config.Config) error {
+func (p *Package) CreateMirror(log *zap.SugaredLogger, dq *utils.DownloadQueue, cfg *config.Config) error {
 	if cfg.GAppsLocalURL != "" && p.LocalURL != "" || cfg.GAppsRemoteURL != "" && p.RemoteURL != "" {
 		return nil
 	}
@@ -45,24 +46,24 @@ func (p *Package) CreateMirror(dq *utils.DownloadQueue, cfg *config.Config) erro
 	if err != nil {
 		return errors.Wrap(err, "unable to read file body")
 	}
-	log.Printf("Package downloaded to %s", filePath)
+	log.Debugf("Package downloaded to %s", filePath)
 
 	// if we have cfg.GAppsLocalPath set, save the file there
 	if cfg.GAppsLocalPath != "" {
 		if filePath, err = p.move(filePath, cfg.GAppsLocalPath); err != nil {
 			return errors.Wrap(err, "unable to move the file to storage")
 		}
-		log.Printf("Package moved to %s", filePath)
+		log.Debugf("Package moved to %s", filePath)
 
 		// if we have cfg.GAppsLocalURL set, provide the local server URL
 		if cfg.GAppsLocalURL != "" {
 			relPath := strings.TrimPrefix(filePath, cfg.GAppsLocalPath)
 			p.LocalURL = fmt.Sprintf(cfg.GAppsLocalURL, relPath)
-			log.Printf("Local URL is %s", p.LocalURL)
+			log.Debugf("Local URL is %s", p.LocalURL)
 		}
 	} else {
 		// delete the file in the end otherwise
-		log.Println("Temp file will be deleted")
+		log.Debug("Temp file will be deleted")
 		defer os.Remove(filePath)
 	}
 
@@ -97,7 +98,7 @@ func (p *Package) CreateMirror(dq *utils.DownloadQueue, cfg *config.Config) erro
 		}
 
 		p.RemoteURL = string(result)
-		log.Printf("File uploaded, remote URL is %s", p.RemoteURL)
+		log.Debugf("File uploaded, remote URL is %s", p.RemoteURL)
 	}
 
 	return nil

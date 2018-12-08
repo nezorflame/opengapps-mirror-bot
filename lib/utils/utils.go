@@ -5,23 +5,27 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 // DownloadQueue is used to limit download process
 type DownloadQueue struct {
+	log    *zap.SugaredLogger
 	tokens chan struct{}
 }
 
 // NewQueue creates a new instance of DownloadQueue
-func NewQueue(maxCount uint) *DownloadQueue {
-	return &DownloadQueue{tokens: make(chan struct{}, maxCount)}
+func NewQueue(log *zap.SugaredLogger, maxCount uint) *DownloadQueue {
+	return &DownloadQueue{
+		log:    log,
+		tokens: make(chan struct{}, maxCount),
+	}
 }
 
 // AddSingle gets a file from URL in single thread
@@ -95,14 +99,14 @@ func (dq *DownloadQueue) multi(url string, size, limit int) (string, error) {
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				log.Println(err)
+				dq.log.Errorf("Unable to make request: %v", err)
 				return
 			}
 			defer resp.Body.Close()
 
 			tmpFile, err := createTmpFile(resp.Body)
 			if err != nil {
-				log.Println(err)
+				dq.log.Errorf("Unable to make temp file: %v", err)
 				return
 			}
 
@@ -177,7 +181,6 @@ func joinFiles(filepaths []string) (string, error) {
 func checkMD5(path, md5sum string) (bool, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		log.Printf("Unable to check MD5: %v", err)
 		return false, errors.Wrap(err, "unable to open the file")
 	}
 	defer file.Close()

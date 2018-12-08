@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -10,8 +11,10 @@ import (
 // Config is used for app configuration
 type Config struct {
 	EnableTracing bool
-	EnableDebug   bool
 	MaxDownloads  uint
+
+	DBPath    string
+	DBTimeout time.Duration
 
 	GAppsTimeFormat     string
 	GAppsPrefix         string
@@ -62,12 +65,19 @@ func Init(name string) (*Config, error) {
 	c := &Config{}
 
 	c.EnableTracing = viper.GetBool("tracing")
-	c.EnableDebug = viper.GetBool("debug")
 	maxDownloads := viper.GetInt("max_downloads")
 	if maxDownloads <= 0 {
 		return nil, errors.Errorf(emptyErr, "max_downloads")
 	}
 	c.MaxDownloads = uint(maxDownloads)
+
+	dbSection := viper.Sub("db")
+	if c.DBPath = dbSection.GetString("path"); c.DBPath == "" {
+		c.DBPath = "./bolt.db"
+	}
+	if c.DBTimeout = dbSection.GetDuration("timeout"); c.DBTimeout <= 0 {
+		return nil, errors.Errorf(emptyErr, "db.timeout")
+	}
 
 	gappsSection := viper.Sub("gapps")
 	if c.GAppsTimeFormat = gappsSection.GetString("time_format"); c.GAppsTimeFormat == "" {

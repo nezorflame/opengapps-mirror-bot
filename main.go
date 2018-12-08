@@ -4,20 +4,23 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
-
-	"github.com/nezorflame/opengapps-mirror-bot/utils"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/go-github/v19/github"
 	"github.com/pkg/errors"
 	"github.com/pkg/profile"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
-	"github.com/nezorflame/opengapps-mirror-bot/config"
-	"github.com/nezorflame/opengapps-mirror-bot/gapps"
+	"github.com/nezorflame/opengapps-mirror-bot/lib/config"
+	"github.com/nezorflame/opengapps-mirror-bot/lib/db"
+	"github.com/nezorflame/opengapps-mirror-bot/lib/gapps"
+	"github.com/nezorflame/opengapps-mirror-bot/lib/utils"
 )
 
 const (
@@ -34,61 +37,93 @@ const (
 type tgbot struct {
 	cfg *config.Config
 	dq  *utils.DownloadQueue
-
+	log *zap.SugaredLogger
 	*tgbotapi.BotAPI
 }
 
 func main() {
-	configName := ""
-	flag.StringVar(&configName, "config", "config", "Config file name")
+	// init flags
+	configName := flag.String("config", "config", "Config file name")
+	level := zap.LevelFlag("log", zap.InfoLevel, "Log level")
 	flag.Parse()
 
-	log.Println("Starting the bot")
-	cfg, err := config.Init(configName)
+	// init logger
+	logConfig := zap.NewDevelopmentConfig()
+	logConfig.Level.SetLevel(*level)
+	logger, err := logConfig.Build()
+	if err != nil {
+		panic(err)
+	}
+	log := logger.Sugar()
+
+	// init config and tracing
+	log.Info("Starting the bot")
+	cfg, err := config.Init(*configName)
 	if err != nil {
 		log.Fatalf("Unable to init config: %v", err)
 	}
-	log.Println("Config parsed")
-
+	log.Info("Config parsed")
 	if cfg.EnableTracing {
-		log.Println("Enabling tracing")
+		log.Debug("Enabling tracing")
 		defer profile.Start(profile.MemProfile, profile.CPUProfile, profile.TraceProfile).Stop()
 	}
 
+	// init Github client
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: cfg.GithubToken},
 	)
 	tc := oauth2.NewClient(context.Background(), ts)
 	ghClient := github.NewClient(tc)
 
-	dq := utils.NewQueue(cfg.MaxDownloads)
-
-	globalStorage := gapps.NewGlobalStorage()
-	if err = globalStorage.Init(ghClient, dq, cfg); err != nil {
-		log.Fatal(err)
-	}
-
-	b, err := tgbotapi.NewBotAPI(cfg.TelegramToken)
+	// init download queue and cache
+	dq := utils.NewQueue(log, cfg.MaxDownloads)
+	cache, err := db.NewDB(log, cfg.DBPath, cfg.DBTimeout)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if cfg.EnableDebug {
-		log.Println("Enabling debug mode")
-		b.Debug = true
+	// init GApps storage
+	globalStorage := gapps.NewGlobalStorage(log, cache)
+	if err = globalStorage.Init(ghClient, dq, cfg); err != nil {
+		log.Fatal(err)
 	}
 
+	// init graceful stop chan
+	var gracefulStop = make(chan os.Signal)
+	signal.Notify(gracefulStop, syscall.SIGTERM)
+	signal.Notify(gracefulStop, syscall.SIGINT)
+	go func() {
+		sig := <-gracefulStop
+		log.Warnf("Caught sig %+v, stopping the app", sig)
+		globalStorage.Save()
+		if err = cache.Close(false); err != nil {
+			log.Errorf("Unable to close DB: %v", err)
+		}
+		log.Sync()
+		os.Exit(0)
+	}()
+
+	// init bot
+	b, err := tgbotapi.NewBotAPI(cfg.TelegramToken)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if cfg.EnableTracing {
+		log.Debug("Enabling debug mode for bot")
+		b.Debug = true
+	}
 	bot := &tgbot{
 		BotAPI: b,
+		log:    log,
 		cfg:    cfg,
 		dq:     dq,
 	}
-	log.Printf("Authorized on account %s", bot.Self.UserName)
+	log.Debugf("Authorized on account %s", bot.Self.UserName)
 
+	// start listening to the updates
 	update := tgbotapi.NewUpdate(0)
 	update.Timeout = bot.cfg.TelegramTimeout
 	updates := bot.GetUpdatesChan(update)
-
 	for u := range updates {
 		if u.Message == nil { // ignore any non-Message Updates
 			continue
@@ -147,9 +182,9 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorInProgress)
 
 		var err error
-		if s, err = gapps.GetPackageStorage(ghClient, b.dq, b.cfg, date); err != nil {
+		if s, err = gapps.GetPackageStorage(b.log, ghClient, b.dq, b.cfg, date); err != nil {
 			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgErrUnknown)
-			log.Fatal("No current storage available")
+			b.log.Fatal("No current storage available")
 		}
 
 		gs.Add(s.Date, s)
@@ -167,18 +202,21 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 	if pkg.LocalURL == "" && pkg.RemoteURL == "" {
 		text = fmt.Sprintf(b.cfg.MsgMirrorFound, pkg.Name, pkg.OriginURL, pkg.MD5, b.cfg.MsgMirrorMissing)
 		b.reply(msg.Chat.ID, 0, text)
-		log.Printf("Creating a mirror for the package %s", pkg.Name)
-		if err := pkg.CreateMirror(b.dq, b.cfg); err != nil {
-			log.Printf("Unable to create mirror: %v", err)
+		b.log.Debugf("Creating a mirror for the package %s", pkg.Name)
+		if err := pkg.CreateMirror(b.log, b.dq, b.cfg); err != nil {
+			b.log.Errorf("Unable to create mirror: %v", err)
 			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorFail)
 			return
+		}
+		if err := s.Save(); err != nil {
+			b.log.Errorf("Unable to save storage: %v", err)
 		}
 		text = b.cfg.MsgMirrorOK
 	} else {
 		text = fmt.Sprintf(b.cfg.MsgMirrorFound, pkg.Name, pkg.OriginURL, pkg.MD5, b.cfg.MsgMirrorOK)
 	}
 
-	log.Printf("Got the mirror for the package %s", pkg.Name)
+	b.log.Debugf("Got the mirror for the package %s", pkg.Name)
 	mirrorResult := ""
 	if pkg.LocalURL != "" {
 		mirrorResult = fmt.Sprintf(mirrorFormat, b.cfg.GAppsLocalHostname, pkg.LocalURL)
@@ -191,7 +229,7 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 	}
 
 	b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(text, mirrorResult))
-	log.Printf("Sent mirror for pkg %s", pkg.Name)
+	b.log.Infof("Sent mirror for pkg %s", pkg.Name)
 }
 
 func (b *tgbot) reply(chatID int64, msgID int, text string) {
@@ -202,7 +240,7 @@ func (b *tgbot) reply(chatID int64, msgID int, text string) {
 	msg.ParseMode = tgbotapi.ModeMarkdown
 
 	if _, err := b.Send(msg); err != nil {
-		log.Printf("Unable to send the message: %v", err)
+		b.log.Errorf("Unable to send the message: %v", err)
 		return
 	}
 }
