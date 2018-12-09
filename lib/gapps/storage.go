@@ -123,6 +123,7 @@ func (s *Storage) Delete(p *Package) {
 func (s *Storage) Save() error {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
+
 	body, err := json.Marshal(s)
 	if err != nil {
 		return errors.Wrapf(err, "unable to marshal storage %s", s.Date)

@@ -71,6 +71,7 @@ func main() {
 	}
 
 	// init Github client
+	log.Info("Creating Github client")
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: cfg.GithubToken},
 	)
@@ -78,6 +79,7 @@ func main() {
 	ghClient := github.NewClient(tc)
 
 	// init download queue and cache
+	log.Info("Creating download queue")
 	dq := utils.NewQueue(log, cfg.MaxDownloads)
 	cache, err := db.NewDB(log, cfg.DBPath, cfg.DBTimeout)
 	if err != nil {
@@ -85,6 +87,7 @@ func main() {
 	}
 
 	// init GApps global storage
+	log.Info("Initiating GApps global storage")
 	globalStorage := gapps.NewGlobalStorage(log, cache)
 	if err = globalStorage.Load(); err != nil {
 		log.Fatalf("Unable to load the global storage from cache: %v", err)
@@ -95,11 +98,13 @@ func main() {
 	}
 
 	// init package watcher
+	log.Info("Initiating GApps package watcher")
 	go func(ctx context.Context) {
 		ticker := time.NewTicker(cfg.GAppsRenewPeriod)
 		for {
 			select {
 			case <-ticker.C:
+				log.Info("Updating the current storage")
 				if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
 					log.Errorf("Unable to add the latest storage: %v", err)
 				}
@@ -112,6 +117,7 @@ func main() {
 	}(ctx)
 
 	// init graceful stop chan
+	log.Info("Initiating system signal watcher")
 	var gracefulStop = make(chan os.Signal)
 	signal.Notify(gracefulStop, syscall.SIGTERM)
 	signal.Notify(gracefulStop, syscall.SIGINT)
@@ -128,6 +134,7 @@ func main() {
 	}()
 
 	// init bot
+	log.Info("Creating Telegram bot")
 	b, err := tgbotapi.NewBotAPI(cfg.TelegramToken)
 	if err != nil {
 		log.Fatal(err)
@@ -145,6 +152,7 @@ func main() {
 	log.Debugf("Authorized on account %s", bot.Self.UserName)
 
 	// start listening to the updates
+	log.Info("Bot created. Listening to the updates")
 	update := tgbotapi.NewUpdate(0)
 	update.Timeout = bot.cfg.TelegramTimeout
 	updates := bot.GetUpdatesChan(update)

@@ -98,9 +98,6 @@ func (gs *GlobalStorage) Save() {
 
 // Load loads the GlobalStorage from the cache
 func (gs *GlobalStorage) Load() error {
-	gs.mtx.Lock()
-	defer gs.mtx.Unlock()
-
 	// check the cache first
 	cachedStorageList, err := gs.cache.Keys()
 	if err != nil {
