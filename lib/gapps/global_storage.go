@@ -1,6 +1,7 @@
 package gapps
 
 import (
+	"context"
 	"encoding/json"
 	"sync"
 
@@ -31,7 +32,7 @@ func NewGlobalStorage(log *zap.SugaredLogger, cache *db.DB) *GlobalStorage {
 }
 
 // Init fills the GlobalStorage with the new Storage for the current release
-func (gs *GlobalStorage) Init(ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config) error {
+func (gs *GlobalStorage) Init(ctx context.Context, ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config) error {
 	var err error
 	s := &Storage{}
 
@@ -57,7 +58,7 @@ func (gs *GlobalStorage) Init(ghClient *github.Client, dq *utils.DownloadQueue, 
 		gs.Add(k, s)
 	}
 
-	releaseDate, err := GetLatestReleaseDate(gs.log, ghClient, cfg.GithubRepo)
+	releaseDate, err := GetLatestReleaseDate(ctx, gs.log, ghClient, cfg.GithubRepo)
 	if err != nil {
 		return errors.Wrap(err, "unable to get latest release date")
 	}
@@ -69,7 +70,7 @@ func (gs *GlobalStorage) Init(ghClient *github.Client, dq *utils.DownloadQueue, 
 	s, ok := gs.Get(releaseDate)
 	if !ok {
 		gs.log.Info("Storage not found, creating a new one")
-		if s, err = GetPackageStorage(gs.log, ghClient, dq, cfg, CurrentStorageKey); err != nil {
+		if s, err = GetPackageStorage(ctx, gs.log, ghClient, dq, cfg, CurrentStorageKey); err != nil {
 			return errors.Wrap(err, "unable to get current package storage")
 		}
 		gs.log.Debug("Storage created successfully")

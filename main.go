@@ -42,7 +42,9 @@ type tgbot struct {
 }
 
 func main() {
-	// init flags
+	// init flags and ctx
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	configName := flag.String("config", "config", "Config file name")
 	level := zap.LevelFlag("log", zap.InfoLevel, "Log level")
 	flag.Parse()
@@ -72,7 +74,7 @@ func main() {
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: cfg.GithubToken},
 	)
-	tc := oauth2.NewClient(context.Background(), ts)
+	tc := oauth2.NewClient(ctx, ts)
 	ghClient := github.NewClient(tc)
 
 	// init download queue and cache
@@ -84,7 +86,7 @@ func main() {
 
 	// init GApps storage
 	globalStorage := gapps.NewGlobalStorage(log, cache)
-	if err = globalStorage.Init(ghClient, dq, cfg); err != nil {
+	if err = globalStorage.Init(ctx, ghClient, dq, cfg); err != nil {
 		log.Fatal(err)
 	}
 
@@ -95,11 +97,12 @@ func main() {
 	go func() {
 		sig := <-gracefulStop
 		log.Warnf("Caught sig %+v, stopping the app", sig)
+		cancel()
 		globalStorage.Save()
 		if err = cache.Close(false); err != nil {
 			log.Errorf("Unable to close DB: %v", err)
 		}
-		log.Sync()
+		_ = log.Sync()
 		os.Exit(0)
 	}()
 
@@ -134,7 +137,7 @@ func main() {
 		case strings.HasPrefix(u.Message.Text, helpCmd):
 			go bot.help(u.Message)
 		case strings.HasPrefix(u.Message.Text, mirrorCmd):
-			go bot.mirror(globalStorage, ghClient, u.Message)
+			go bot.mirror(ctx, globalStorage, ghClient, u.Message)
 		}
 	}
 }
@@ -147,7 +150,7 @@ func (b *tgbot) help(msg *tgbotapi.Message) {
 	b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgHelp)
 }
 
-func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tgbotapi.Message) {
+func (b *tgbot) mirror(ctx context.Context, gs *gapps.GlobalStorage, ghClient *github.Client, msg *tgbotapi.Message) {
 	// parse the message
 	cmd := strings.Replace(msg.Text, ".", "", -1)
 	parts := strings.Split(cmd, " ")
@@ -182,7 +185,7 @@ func (b *tgbot) mirror(gs *gapps.GlobalStorage, ghClient *github.Client, msg *tg
 		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorInProgress)
 
 		var err error
-		if s, err = gapps.GetPackageStorage(b.log, ghClient, b.dq, b.cfg, date); err != nil {
+		if s, err = gapps.GetPackageStorage(ctx, b.log, ghClient, b.dq, b.cfg, date); err != nil {
 			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgErrUnknown)
 			b.log.Fatal("No current storage available")
 		}

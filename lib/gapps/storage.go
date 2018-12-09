@@ -30,8 +30,8 @@ type Storage struct {
 }
 
 // GetPackageStorage creates and fills a new Storage
-func GetPackageStorage(log *zap.SugaredLogger, ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config, releaseTag string) (*Storage, error) {
-	releases, err := getAllReleasesByTag(log, ghClient, cfg.GithubRepo, releaseTag)
+func GetPackageStorage(ctx context.Context, log *zap.SugaredLogger, ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config, releaseTag string) (*Storage, error) {
+	releases, err := getAllReleasesByTag(ctx, log, ghClient, cfg.GithubRepo, releaseTag)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get latest releases from Github")
 	}
@@ -138,8 +138,8 @@ func (s *Storage) Save() error {
 }
 
 // GetLatestReleaseDate returns the date for the latest OpenGApps release
-func GetLatestReleaseDate(log *zap.SugaredLogger, ghClient *github.Client, repo string) (string, error) {
-	releases, err := getAllReleasesByTag(log, ghClient, repo, CurrentStorageKey)
+func GetLatestReleaseDate(ctx context.Context, log *zap.SugaredLogger, ghClient *github.Client, repo string) (string, error) {
+	releases, err := getAllReleasesByTag(ctx, log, ghClient, repo, CurrentStorageKey)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to get latest releases from Github")
 	}
@@ -153,7 +153,7 @@ func GetLatestReleaseDate(log *zap.SugaredLogger, ghClient *github.Client, repo 
 	return releaseDates[0], nil
 }
 
-func getAllReleasesByTag(log *zap.SugaredLogger, ghClient *github.Client, repo, tag string) ([]*github.RepositoryRelease, error) {
+func getAllReleasesByTag(ctx context.Context, log *zap.SugaredLogger, ghClient *github.Client, repo, tag string) ([]*github.RepositoryRelease, error) {
 	var (
 		releases = make([]*github.RepositoryRelease, len(PlatformValues()))
 		release  *github.RepositoryRelease
@@ -167,9 +167,9 @@ func getAllReleasesByTag(log *zap.SugaredLogger, ghClient *github.Client, repo, 
 
 	for _, platform := range PlatformValues() {
 		if tag == CurrentStorageKey {
-			release, resp, err = ghClient.Repositories.GetLatestRelease(context.Background(), repo, platform.String())
+			release, resp, err = ghClient.Repositories.GetLatestRelease(ctx, repo, platform.String())
 		} else {
-			release, resp, err = ghClient.Repositories.GetReleaseByTag(context.Background(), repo, platform.String(), tag)
+			release, resp, err = ghClient.Repositories.GetReleaseByTag(ctx, repo, platform.String(), tag)
 		}
 		if err != nil {
 			log.Errorf("Unable to get release from Github: %v", err)
