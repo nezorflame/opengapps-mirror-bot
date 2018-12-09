@@ -8,6 +8,7 @@ timeout = "1s"
 [gapps]
 time_format = "20060102"
 prefix = "open_gapps"
+renew_period = "60m"
 local_path = "/path/to/gapps/mirror/storage/"
 local_url = "https://your.web.server/%s"
 local_host = "your.web.server"

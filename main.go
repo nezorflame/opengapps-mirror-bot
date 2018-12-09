@@ -84,11 +84,32 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// init GApps storage
+	// init GApps global storage
 	globalStorage := gapps.NewGlobalStorage(log, cache)
-	if err = globalStorage.Init(ctx, ghClient, dq, cfg); err != nil {
-		log.Fatal(err)
+	if err = globalStorage.Load(); err != nil {
+		log.Fatalf("Unable to load the global storage from cache: %v", err)
 	}
+
+	if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
+		log.Fatalf("Unable to add the latest storage: %v", err)
+	}
+
+	// init package watcher
+	go func(ctx context.Context) {
+		ticker := time.NewTicker(cfg.GAppsRenewPeriod)
+		for {
+			select {
+			case <-ticker.C:
+				if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
+					log.Errorf("Unable to add the latest storage: %v", err)
+				}
+			case <-ctx.Done():
+				log.Warnf("Closing the watcher by context: %v", ctx.Err())
+				ticker.Stop()
+				return
+			}
+		}
+	}(ctx)
 
 	// init graceful stop chan
 	var gracefulStop = make(chan os.Signal)

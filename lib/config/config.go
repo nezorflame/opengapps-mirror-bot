@@ -18,6 +18,7 @@ type Config struct {
 
 	GAppsTimeFormat     string
 	GAppsPrefix         string
+	GAppsRenewPeriod    time.Duration
 	GAppsLocalPath      string
 	GAppsLocalURL       string
 	GAppsLocalHostname  string
@@ -63,7 +64,6 @@ func Init(name string) (*Config, error) {
 	}
 
 	c := &Config{}
-
 	c.EnableTracing = viper.GetBool("tracing")
 	maxDownloads := viper.GetInt("max_downloads")
 	if maxDownloads <= 0 {
@@ -86,13 +86,14 @@ func Init(name string) (*Config, error) {
 	if c.GAppsPrefix = gappsSection.GetString("prefix"); c.GAppsPrefix == "" {
 		return nil, errors.Errorf(emptyErr, "gapps.prefix")
 	}
-
+	if c.GAppsRenewPeriod = gappsSection.GetDuration("renew_period"); c.GAppsRenewPeriod <= 0 {
+		return nil, errors.Errorf(emptyErr, "gapps.renew_period")
+	}
 	if c.GAppsLocalPath = gappsSection.GetString("local_path"); c.GAppsLocalPath != "" {
 		if _, err := os.Stat(c.GAppsLocalPath); os.IsNotExist(err) {
 			return nil, errors.New("folder on path 'gapps.local_path' does not exist")
 		}
 	}
-
 	if c.GAppsLocalURL = gappsSection.GetString("local_url"); c.GAppsLocalURL != "" {
 		if c.GAppsLocalPath == "" {
 			return nil, errors.New("you must provide 'gapps.local_path' along with 'gapps.local_url'")
@@ -101,13 +102,11 @@ func Init(name string) (*Config, error) {
 			return nil, errors.New("you must provide 'gapps.local_host' along with 'gapps.local_url'")
 		}
 	}
-
 	if c.GAppsRemoteURL = gappsSection.GetString("remote_url"); c.GAppsRemoteURL != "" {
 		if c.GAppsRemoteHostname = gappsSection.GetString("remote_host"); c.GAppsRemoteHostname == "" {
 			return nil, errors.New("you must provide 'gapps.remote_host' along with 'gapps.remote_url'")
 		}
 	}
-
 	if c.GAppsLocalURL == "" && c.GAppsRemoteURL == "" {
 		return nil, errors.New("you must provide either 'gapps.local_url' or 'gapps.remote_url'")
 	}
