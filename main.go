@@ -50,7 +50,8 @@ func main() {
 	flag.Parse()
 
 	// init logger
-	logConfig := zap.NewProductionConfig()
+	logConfig := zap.NewDevelopmentConfig()
+	logConfig.Encoding = "json"
 	logConfig.Level.SetLevel(*level)
 	logger, err := logConfig.Build()
 	if err != nil {

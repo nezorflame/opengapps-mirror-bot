@@ -48,12 +48,12 @@ func (gs *GlobalStorage) AddLatest(ctx context.Context, ghClient *github.Client,
 		if s, err = GetPackageStorage(ctx, logger, ghClient, dq, cfg, CurrentStorageKey); err != nil {
 			return errors.Wrap(err, "unable to get current package storage")
 		}
-		logger.Debug("Storage created successfully")
+		logger.Debug("Saving the storage")
+		gs.Add(s.Date, s)
 		if err = s.Save(); err != nil {
 			return errors.Wrap(err, "unable to save new storage")
 		}
-		logger.Debug("Storage saved successfully")
-		gs.Add(s.Date, s)
+		logger.Debug("Storage added successfully")
 	}
 
 	logger.Debug("Setting storage as current")
@@ -79,6 +79,9 @@ func (gs *GlobalStorage) Get(date string) (*Storage, bool) {
 	gs.mtx.RLock()
 	defer gs.mtx.RUnlock()
 	s, ok := gs.storages[date]
+	if s != nil && s.cache == nil {
+		s.cache = gs.cache
+	}
 	return s, ok
 }
 
