@@ -165,10 +165,10 @@ func main() {
 		case strings.HasPrefix(u.Message.Text, startCmd):
 			go bot.hello(u.Message)
 		case strings.HasPrefix(u.Message.Text, helpCmd):
-			log.Debugf("Got /hello request from user %d (@%s)", u.Message.From.ID, u.Message.From.UserName)
+			log.With("user_id", u.Message.From.ID).Debug("Got /help request")
 			go bot.help(u.Message)
 		case strings.HasPrefix(u.Message.Text, mirrorCmd):
-			log.Debugf("Got /mirror request from user %d (@%s)", u.Message.From.ID, u.Message.From.UserName)
+			log.With("user_id", u.Message.From.ID).Debug("Got /mirror request")
 			go bot.mirror(ctx, globalStorage, ghClient, u.Message)
 		}
 	}
@@ -184,6 +184,7 @@ func (b *tgbot) help(msg *tgbotapi.Message) {
 
 func (b *tgbot) mirror(ctx context.Context, gs *gapps.GlobalStorage, ghClient *github.Client, msg *tgbotapi.Message) {
 	// parse the message
+	logger := b.log.With("chat_id", msg.Chat.ID, "msg_id", msg.MessageID)
 	cmd := strings.Replace(msg.Text, ".", "", -1)
 	parts := strings.Split(cmd, " ")
 	if len(parts) < 2 {
@@ -217,9 +218,9 @@ func (b *tgbot) mirror(ctx context.Context, gs *gapps.GlobalStorage, ghClient *g
 		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorInProgress)
 
 		var err error
-		if s, err = gapps.GetPackageStorage(ctx, b.log, ghClient, b.dq, b.cfg, date); err != nil {
+		if s, err = gapps.GetPackageStorage(ctx, logger, ghClient, b.dq, b.cfg, date); err != nil {
 			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgErrUnknown)
-			b.log.Fatal("No current storage available")
+			logger.Fatal("No current storage available")
 		}
 
 		gs.Add(s.Date, s)
@@ -237,21 +238,21 @@ func (b *tgbot) mirror(ctx context.Context, gs *gapps.GlobalStorage, ghClient *g
 	if pkg.LocalURL == "" && pkg.RemoteURL == "" {
 		text = fmt.Sprintf(b.cfg.MsgMirrorFound, pkg.Name, pkg.OriginURL, pkg.MD5, b.cfg.MsgMirrorMissing)
 		b.reply(msg.Chat.ID, 0, text)
-		b.log.Debugf("Creating a mirror for the package %s", pkg.Name)
-		if err := pkg.CreateMirror(b.log, b.dq, b.cfg); err != nil {
-			b.log.Errorf("Unable to create mirror: %v", err)
+		logger.Debugf("Creating a mirror for the package %s", pkg.Name)
+		if err := pkg.CreateMirror(logger, b.dq, b.cfg); err != nil {
+			logger.Errorf("Unable to create mirror: %v", err)
 			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.MsgMirrorFail)
 			return
 		}
 		if err := s.Save(); err != nil {
-			b.log.Errorf("Unable to save storage: %v", err)
+			logger.Errorf("Unable to save storage: %v", err)
 		}
 		text = b.cfg.MsgMirrorOK
 	} else {
 		text = fmt.Sprintf(b.cfg.MsgMirrorFound, pkg.Name, pkg.OriginURL, pkg.MD5, b.cfg.MsgMirrorOK)
 	}
 
-	b.log.Debugf("Got the mirror for the package %s", pkg.Name)
+	logger.Debugf("Got the mirror for the package %s", pkg.Name)
 	mirrorResult := ""
 	if pkg.LocalURL != "" {
 		mirrorResult = fmt.Sprintf(mirrorFormat, b.cfg.GAppsLocalHostname, pkg.LocalURL)
@@ -264,10 +265,11 @@ func (b *tgbot) mirror(ctx context.Context, gs *gapps.GlobalStorage, ghClient *g
 	}
 
 	b.reply(msg.Chat.ID, msg.MessageID, fmt.Sprintf(text, mirrorResult))
-	b.log.Infof("Sent mirror for pkg %s", pkg.Name)
+	logger.Infof("Sent mirror for pkg %s", pkg.Name)
 }
 
 func (b *tgbot) reply(chatID int64, msgID int, text string) {
+	b.log.With("chat_id", chatID, "msg_id", msgID).Debug("Sending reply")
 	msg := tgbotapi.NewMessage(chatID, fmt.Sprintf(text))
 	if msgID != 0 {
 		msg.ReplyToMessageID = msgID
