@@ -165,8 +165,10 @@ func main() {
 		case strings.HasPrefix(u.Message.Text, startCmd):
 			go bot.hello(u.Message)
 		case strings.HasPrefix(u.Message.Text, helpCmd):
+			log.Debugf("Got /hello request from %s (@%s)", u.Message.From.ID, u.Message.From.UserName)
 			go bot.help(u.Message)
 		case strings.HasPrefix(u.Message.Text, mirrorCmd):
+			log.Debugf("Got /mirror request from %s (@%s)", u.Message.From.ID, u.Message.From.UserName)
 			go bot.mirror(ctx, globalStorage, ghClient, u.Message)
 		}
 	}
