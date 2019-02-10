@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/google/go-github/v19/github"
 	"github.com/pkg/profile"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 
 	"github.com/nezorflame/opengapps-mirror-bot/lib/config"
 	"github.com/nezorflame/opengapps-mirror-bot/lib/db"
+	"github.com/nezorflame/opengapps-mirror-bot/lib/gapps"
 	"github.com/nezorflame/opengapps-mirror-bot/lib/utils"
 )
 
@@ -25,8 +30,8 @@ const (
 
 func main() {
 	// init flags and ctx
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	configName := flag.String("config", "config", "Config file name")
 	level := zap.LevelFlag("log", zap.InfoLevel, "Log level")
 	flag.Parse()
@@ -54,12 +59,12 @@ func main() {
 	}
 
 	// init Github client
-	// log.Info("Creating Github client")
-	// ts := oauth2.StaticTokenSource(
-	// 	&oauth2.Token{AccessToken: cfg.GithubToken},
-	// )
-	// tc := oauth2.NewClient(ctx, ts)
-	// ghClient := github.NewClient(tc)
+	log.Info("Creating Github client")
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: cfg.GithubToken},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+	ghClient := github.NewClient(tc)
 
 	// init download queue and cache
 	log.Info("Creating download queue")
@@ -70,34 +75,34 @@ func main() {
 	}
 
 	// init GApps global storage
-	// log.Info("Initiating GApps global storage")
-	// globalStorage := gapps.NewGlobalStorage(log, cache)
-	// if err = globalStorage.Load(); err != nil {
-	// 	log.Fatalf("Unable to load the global storage from cache: %v", err)
-	// }
+	log.Info("Initiating GApps global storage")
+	globalStorage := gapps.NewGlobalStorage(log, cache)
+	if err = globalStorage.Load(); err != nil {
+		log.Fatalf("Unable to load the global storage from cache: %v", err)
+	}
 
-	// if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
-	// 	log.Fatalf("Unable to add the latest storage: %v", err)
-	// }
+	if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
+		log.Fatalf("Unable to add the latest storage: %v", err)
+	}
 
 	// init package watcher
-	// log.Info("Initiating GApps package watcher")
-	// go func(ctx context.Context) {
-	// 	ticker := time.NewTicker(cfg.GAppsRenewPeriod)
-	// 	for {
-	// 		select {
-	// 		case <-ticker.C:
-	// 			log.Info("Updating the current storage")
-	// 			if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
-	// 				log.Errorf("Unable to add the latest storage: %v", err)
-	// 			}
-	// 		case <-ctx.Done():
-	// 			log.Warnf("Closing the watcher by context: %v", ctx.Err())
-	// 			ticker.Stop()
-	// 			return
-	// 		}
-	// 	}
-	// }(ctx)
+	log.Info("Initiating GApps package watcher")
+	go func(ctx context.Context) {
+		ticker := time.NewTicker(cfg.GAppsRenewPeriod)
+		for {
+			select {
+			case <-ticker.C:
+				log.Info("Updating the current storage")
+				if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
+					log.Errorf("Unable to add the latest storage: %v", err)
+				}
+			case <-ctx.Done():
+				log.Warnf("Closing the watcher by context: %v", ctx.Err())
+				ticker.Stop()
+				return
+			}
+		}
+	}(ctx)
 
 	// init graceful stop chan
 	log.Info("Initiating system signal watcher")
@@ -107,8 +112,8 @@ func main() {
 	go func() {
 		sig := <-gracefulStop
 		log.Warnf("Caught sig %+v, stopping the app", sig)
-		// cancel()
-		// globalStorage.Save()
+		cancel()
+		globalStorage.Save()
 		if err = cache.Close(false); err != nil {
 			log.Errorf("Unable to close DB: %v", err)
 		}
