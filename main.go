@@ -94,7 +94,7 @@ func main() {
 		log.Fatalf("Unable to load the global storage from cache: %v", err)
 	}
 
-	if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
+	if err = globalStorage.AddLatestStorage(ctx, ghClient, dq, cfg); err != nil {
 		log.Fatalf("Unable to add the latest storage: %v", err)
 	}
 
@@ -106,7 +106,7 @@ func main() {
 			select {
 			case <-ticker.C:
 				log.Info("Updating the current storage")
-				if err = globalStorage.AddLatest(ctx, ghClient, dq, cfg); err != nil {
+				if err = globalStorage.AddLatestStorage(ctx, ghClient, dq, cfg); err != nil {
 					log.Errorf("Unable to add the latest storage: %v", err)
 				}
 			case <-ctx.Done():

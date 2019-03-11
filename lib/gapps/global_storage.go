@@ -31,8 +31,8 @@ func NewGlobalStorage(log *zap.SugaredLogger, cache *db.DB) *GlobalStorage {
 	}
 }
 
-// AddLatest adds the latest Storage to the storages
-func (gs *GlobalStorage) AddLatest(ctx context.Context, ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config) error {
+// AddLatestStorage adds the latest Storage to the storages
+func (gs *GlobalStorage) AddLatestStorage(ctx context.Context, ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config) error {
 	releaseDate, err := GetLatestReleaseDate(ctx, gs.log, ghClient, cfg.GithubRepo)
 	if err != nil {
 		return errors.Wrap(err, "unable to get latest release date")
@@ -45,7 +45,7 @@ func (gs *GlobalStorage) AddLatest(ctx context.Context, ghClient *github.Client,
 	s, ok := gs.Get(releaseDate)
 	if !ok {
 		logger.Info("Storage not found, creating a new one")
-		if s, err = GetPackageStorage(ctx, logger, ghClient, dq, cfg, CurrentStorageKey); err != nil {
+		if s, err = GetPackageStorage(ctx, logger, ghClient, dq, cfg, releaseDate); err != nil {
 			return errors.Wrap(err, "unable to get current package storage")
 		}
 		logger.Debug("Saving the storage")
