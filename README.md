@@ -1,4 +1,4 @@
-# opengapps-mirror-bot [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/opengapps-mirror-bot)](https://goreportcard.com/report/github.com/nezorflame/opengapps-mirror-bot) [![Build Status](https://travis-ci.com/nezorflame/opengapps-mirror-bot.svg?branch=master)](https://travis-ci.com/nezorflame/opengapps-mirror-bot)
+# opengapps-mirror-bot [![CircleCI](https://circleci.com/gh/nezorflame/opengapps-mirror-bot/tree/master.svg?style=svg)](https://circleci.com/gh/nezorflame/opengapps-mirror-bot/tree/master) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/opengapps-mirror-bot)](https://goreportcard.com/report/github.com/nezorflame/opengapps-mirror-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/opengapps-mirror-bot.svg)](https://golangci.com/r/github.com/nezorflame/opengapps-mirror-bot)
 
 This is a Telegram bot which allows you to create a locally and remotely hosted mirrors for any existing OpenGApps package.
 
