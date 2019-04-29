@@ -1,43 +1,41 @@
-package gapps
+package storage
 
 import (
 	"context"
 	"encoding/json"
 	"sync"
 
-	"github.com/google/go-github/v19/github"
-	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"github.com/nezorflame/opengapps-mirror-bot/internal/pkg/db"
+	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
 
-	"github.com/nezorflame/opengapps-mirror-bot/lib/config"
-	"github.com/nezorflame/opengapps-mirror-bot/lib/db"
-	"github.com/nezorflame/opengapps-mirror-bot/lib/utils"
+	"github.com/google/go-github/v25/github"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 // GlobalStorage stores all the available storages
 type GlobalStorage struct {
-	log      *zap.SugaredLogger
 	storages map[string]*Storage
 	cache    *db.DB
 	mtx      sync.RWMutex
 }
 
 // NewGlobalStorage creates a new GlobalStorage instance
-func NewGlobalStorage(log *zap.SugaredLogger, cache *db.DB) *GlobalStorage {
+func NewGlobalStorage(cache *db.DB) *GlobalStorage {
 	return &GlobalStorage{
-		log:      log,
 		storages: make(map[string]*Storage),
 		cache:    cache,
 	}
 }
 
 // AddLatestStorage adds the latest Storage to the storages
-func (gs *GlobalStorage) AddLatestStorage(ctx context.Context, ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config) error {
-	releaseDate, err := GetLatestReleaseDate(ctx, gs.log, ghClient, cfg.GithubRepo)
+func (gs *GlobalStorage) AddLatestStorage(ctx context.Context, ghClient *github.Client, dq *net.DownloadQueue, cfg *viper.Viper) error {
+	releaseDate, err := GetLatestReleaseDate(ctx, ghClient, cfg.GetString("github.repo"))
 	if err != nil {
 		return errors.Wrap(err, "unable to get latest release date")
 	}
-	logger := gs.log.With("release_date", releaseDate)
+	logger := log.WithField("release_date", releaseDate)
 	logger.Debugf("Got the newest release date")
 
 	// check if the current package is in cache and is up-to-date
@@ -45,7 +43,7 @@ func (gs *GlobalStorage) AddLatestStorage(ctx context.Context, ghClient *github.
 	s, ok := gs.Get(releaseDate)
 	if !ok {
 		logger.Info("Storage not found, creating a new one")
-		if s, err = GetPackageStorage(ctx, logger, ghClient, dq, cfg, releaseDate); err != nil {
+		if s, err = GetPackageStorage(ctx, ghClient, dq, cfg, releaseDate); err != nil {
 			return errors.Wrap(err, "unable to get current package storage")
 		}
 		logger.Debug("Saving the storage")
@@ -94,7 +92,7 @@ func (gs *GlobalStorage) Save() {
 			continue
 		}
 		if err := s.Save(); err != nil {
-			gs.log.Errorf("Unable to save storage %s: %v", k, err)
+			log.Errorf("Unable to save storage %s: %v", k, err)
 		}
 	}
 }
@@ -106,18 +104,18 @@ func (gs *GlobalStorage) Load() error {
 	if err != nil {
 		return errors.Wrap(err, "unable to load storage list from cache")
 	}
-	gs.log.Debug("Got the release keys: ", cachedStorageList)
+	log.Debug("Got the release keys: ", cachedStorageList)
 
 	s := &Storage{}
 	var sBody []byte
 	for _, k := range cachedStorageList {
 		if sBody, err = gs.cache.Get(k); err != nil {
-			gs.log.Warnf("Unable to get storage from cache for package '%s': %v", k, err)
+			log.Warnf("Unable to get storage from cache for package '%s': %v", k, err)
 			continue
 		}
 
 		if err = json.Unmarshal(sBody, s); err != nil {
-			gs.log.Warnf("Unable to unmarshal storage from cache for package '%s': %v", k, err)
+			log.Warnf("Unable to unmarshal storage from cache for package '%s': %v", k, err)
 			continue
 		}
 

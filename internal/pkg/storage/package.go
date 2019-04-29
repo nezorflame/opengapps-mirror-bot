@@ -1,4 +1,4 @@
-package gapps
+package storage
 
 import (
 	"fmt"
@@ -8,36 +8,35 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v19/github"
+	"github.com/nezorflame/opengapps-mirror-bot/pkg/gapps"
+	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
+
+	"github.com/google/go-github/v25/github"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
-
-	"github.com/nezorflame/opengapps-mirror-bot/lib/config"
-	"github.com/nezorflame/opengapps-mirror-bot/lib/utils"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
-const (
-	parsingErrText = "parsing error"
-	gappsSeparator = "-"
-)
+const gappsSeparator = "-"
 
 // Package describes the OpenGApps package
 type Package struct {
-	Name      string   `json:"name"`
-	Date      string   `json:"date"`
-	OriginURL string   `json:"origin_url"`
-	LocalURL  string   `json:"local_url"`
-	RemoteURL string   `json:"remote_url"`
-	MD5       string   `json:"md5"`
-	Size      int      `json:"size"`
-	Platform  Platform `json:"platform"`
-	Android   Android  `json:"android"`
-	Variant   Variant  `json:"variant"`
+	Name      string         `json:"name"`
+	Date      string         `json:"date"`
+	OriginURL string         `json:"origin_url"`
+	LocalURL  string         `json:"local_url"`
+	RemoteURL string         `json:"remote_url"`
+	MD5       string         `json:"md5"`
+	Size      int            `json:"size"`
+	Platform  gapps.Platform `json:"platform"`
+	Android   gapps.Android  `json:"android"`
+	Variant   gapps.Variant  `json:"variant"`
 }
 
 // CreateMirror creates a new mirror for the package
-func (p *Package) CreateMirror(log *zap.SugaredLogger, dq *utils.DownloadQueue, cfg *config.Config) error {
-	if cfg.GAppsLocalURL != "" && p.LocalURL != "" || cfg.GAppsRemoteURL != "" && p.RemoteURL != "" {
+func (p *Package) CreateMirror(dq *net.DownloadQueue, cfg *viper.Viper) error {
+	if cfg.GetString("gapps.local_url") != "" && p.LocalURL != "" ||
+		cfg.GetString("gapps.remote_url") != "" && p.RemoteURL != "" {
 		return nil
 	}
 
@@ -48,17 +47,17 @@ func (p *Package) CreateMirror(log *zap.SugaredLogger, dq *utils.DownloadQueue, 
 	}
 	log.Debugf("Package downloaded to %s", filePath)
 
-	// if we have cfg.GAppsLocalPath set, save the file there
-	if cfg.GAppsLocalPath != "" {
-		if filePath, err = p.move(filePath, cfg.GAppsLocalPath); err != nil {
+	// if we have local_path set, save the file there
+	if localPath := cfg.GetString("gapps.local_path"); localPath != "" {
+		if filePath, err = p.move(filePath, localPath); err != nil {
 			return errors.Wrap(err, "unable to move the file to storage")
 		}
 		log.Debugf("Package moved to %s", filePath)
 
-		// if we have cfg.GAppsLocalURL set, provide the local server URL
-		if cfg.GAppsLocalURL != "" {
-			relPath := strings.TrimPrefix(filePath, cfg.GAppsLocalPath)
-			p.LocalURL = fmt.Sprintf(cfg.GAppsLocalURL, relPath)
+		// if we have local_url set, provide the local server URL
+		if localURL := cfg.GetString("gapps.local_url"); localURL != "" {
+			relPath := strings.TrimPrefix(filePath, localPath)
+			p.LocalURL = fmt.Sprintf(localURL, relPath)
 			log.Debugf("Local URL is %s", p.LocalURL)
 		}
 	} else {
@@ -67,15 +66,15 @@ func (p *Package) CreateMirror(log *zap.SugaredLogger, dq *utils.DownloadQueue, 
 		defer os.Remove(filePath)
 	}
 
-	// if we have cfg.GAppsRemoteURL set, send the file to remote URL
-	if cfg.GAppsRemoteURL != "" {
+	// if we have remote_url set, send the file to remote URL
+	if remoteURL := cfg.GetString("gapps.remote_url"); remoteURL != "" {
 		tmpFile, err := os.Open(filePath)
 		if err != nil {
 			return errors.Wrap(err, "unable to create temp file")
 		}
 		defer tmpFile.Close()
 
-		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(cfg.GAppsRemoteURL, p.Name), tmpFile)
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(remoteURL, p.Name), tmpFile)
 		if err != nil {
 			return errors.Wrap(err, "unable to create upload request")
 		}
@@ -122,31 +121,7 @@ func (p *Package) move(origin, destFolder string) (string, error) {
 	return path, nil
 }
 
-// ParsePackageParts helps to parse package info args into proper parts
-func ParsePackageParts(args []string) (Platform, Android, Variant, error) {
-	if len(args) != 3 {
-		return 0, 0, 0, errors.Errorf("bad number of arguments: want 4, got %d", len(args))
-	}
-
-	platform, err := PlatformString(args[0])
-	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, parsingErrText)
-	}
-
-	android, err := AndroidString(args[1])
-	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, parsingErrText)
-	}
-
-	variant, err := VariantString(args[2])
-	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, parsingErrText)
-	}
-
-	return platform, android, variant, nil
-}
-
-func formPackage(dq *utils.DownloadQueue, cfg *config.Config, zipAsset, md5Asset github.ReleaseAsset) (*Package, error) {
+func formPackage(dq *net.DownloadQueue, cfg *viper.Viper, zipAsset, md5Asset github.ReleaseAsset) (*Package, error) {
 	md5sum, err := getMD5(dq, md5Asset.GetBrowserDownloadURL())
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to download md5")
@@ -160,7 +135,7 @@ func formPackage(dq *utils.DownloadQueue, cfg *config.Config, zipAsset, md5Asset
 	return p, nil
 }
 
-func getMD5(dq *utils.DownloadQueue, url string) (string, error) {
+func getMD5(dq *net.DownloadQueue, url string) (string, error) {
 	filePath, err := dq.AddSingle(url)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to download MD5 file")
@@ -182,9 +157,9 @@ func getMD5(dq *utils.DownloadQueue, url string) (string, error) {
 
 // Package name format is as follows:
 // open_gapps-Platform-Android-Variant-Date.zip
-func parseAsset(cfg *config.Config, asset github.ReleaseAsset, md5Sum string) (*Package, error) {
+func parseAsset(cfg *viper.Viper, asset github.ReleaseAsset, md5Sum string) (*Package, error) {
 	name := asset.GetName()
-	parts := strings.Split(strings.TrimPrefix(name, cfg.GAppsPrefix+gappsSeparator), ".")
+	parts := strings.Split(strings.TrimPrefix(name, cfg.GetString("gapps.prefix")+gappsSeparator), ".")
 	if len(parts) != 3 {
 		return nil, errors.Errorf("incorrect package name: %s", name)
 	}
@@ -199,12 +174,12 @@ func parseAsset(cfg *config.Config, asset github.ReleaseAsset, md5Sum string) (*
 		return nil, errors.Errorf("incorrect package name: %s", name)
 	}
 
-	platform, android, variant, err := ParsePackageParts(parts[:3])
+	platform, android, variant, err := gapps.ParsePackageParts(parts[:3])
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err = time.Parse(cfg.GAppsTimeFormat, parts[3]); err != nil {
+	if _, err = time.Parse(cfg.GetString("gapps.time_format"), parts[3]); err != nil {
 		return nil, errors.Wrap(err, "unable to parse time")
 	}
 

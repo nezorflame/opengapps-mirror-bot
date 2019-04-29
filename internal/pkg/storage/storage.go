@@ -1,4 +1,4 @@
-package gapps
+package storage
 
 import (
 	"context"
@@ -8,13 +8,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/go-github/v19/github"
+	"github.com/google/go-github/v25/github"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
-	"github.com/nezorflame/opengapps-mirror-bot/lib/config"
-	"github.com/nezorflame/opengapps-mirror-bot/lib/db"
-	"github.com/nezorflame/opengapps-mirror-bot/lib/utils"
+	"github.com/nezorflame/opengapps-mirror-bot/internal/pkg/db"
+	"github.com/nezorflame/opengapps-mirror-bot/pkg/gapps"
+	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
 )
 
 // CurrentStorageKey is used as GlobalStorage key for the current package
@@ -22,21 +23,21 @@ const CurrentStorageKey = "current"
 
 // Storage describes a package storage
 type Storage struct {
-	Date     string                                        `json:"date"`
-	Count    int                                           `json:"count"`
-	Packages map[Platform]map[Android]map[Variant]*Package `json:"packages"`
+	Date     string                                                          `json:"date"`
+	Count    int                                                             `json:"count"`
+	Packages map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package `json:"packages"`
 	cache    *db.DB
 	mtx      sync.RWMutex
 }
 
 // GetPackageStorage creates and fills a new Storage
-func GetPackageStorage(ctx context.Context, log *zap.SugaredLogger, ghClient *github.Client, dq *utils.DownloadQueue, cfg *config.Config, releaseTag string) (*Storage, error) {
-	releases, err := getAllReleasesByTag(ctx, log, ghClient, cfg.GithubRepo, releaseTag)
+func GetPackageStorage(ctx context.Context, ghClient *github.Client, dq *net.DownloadQueue, cfg *viper.Viper, releaseTag string) (*Storage, error) {
+	releases, err := getAllReleasesByTag(ctx, ghClient, cfg.GetString("github.repo"), releaseTag)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get latest releases from Github")
 	}
 
-	storage := &Storage{Packages: make(map[Platform]map[Android]map[Variant]*Package, len(releases))}
+	storage := &Storage{Packages: make(map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package, len(releases))}
 	for _, release := range releases {
 		zipSlice := make([]github.ReleaseAsset, 0, len(release.Assets))
 		md5Slice := make([]github.ReleaseAsset, 0, len(release.Assets))
@@ -77,10 +78,10 @@ func GetPackageStorage(ctx context.Context, log *zap.SugaredLogger, ghClient *gi
 func (s *Storage) Add(p *Package) {
 	s.mtx.Lock()
 	if s.Packages[p.Platform] == nil {
-		s.Packages[p.Platform] = make(map[Android]map[Variant]*Package, len(AndroidValues()))
+		s.Packages[p.Platform] = make(map[gapps.Android]map[gapps.Variant]*Package, len(gapps.AndroidValues()))
 	}
 	if s.Packages[p.Platform][p.Android] == nil {
-		s.Packages[p.Platform][p.Android] = make(map[Variant]*Package, len(VariantValues()))
+		s.Packages[p.Platform][p.Android] = make(map[gapps.Variant]*Package, len(gapps.VariantValues()))
 	}
 	if _, ok := s.Packages[p.Platform][p.Android][p.Variant]; !ok {
 		s.Count++
@@ -93,7 +94,7 @@ func (s *Storage) Add(p *Package) {
 }
 
 // Get safely gets a package from the Storage
-func (s *Storage) Get(p Platform, a Android, v Variant) (*Package, bool) {
+func (s *Storage) Get(p gapps.Platform, a gapps.Android, v gapps.Variant) (*Package, bool) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
@@ -139,8 +140,8 @@ func (s *Storage) Save() error {
 }
 
 // GetLatestReleaseDate returns the date for the latest OpenGApps release
-func GetLatestReleaseDate(ctx context.Context, log *zap.SugaredLogger, ghClient *github.Client, repo string) (string, error) {
-	releases, err := getAllReleasesByTag(ctx, log, ghClient, repo, CurrentStorageKey)
+func GetLatestReleaseDate(ctx context.Context, ghClient *github.Client, repo string) (string, error) {
+	releases, err := getAllReleasesByTag(ctx, ghClient, repo, CurrentStorageKey)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to get latest releases from Github")
 	}
@@ -154,9 +155,9 @@ func GetLatestReleaseDate(ctx context.Context, log *zap.SugaredLogger, ghClient 
 	return releaseDates[0], nil
 }
 
-func getAllReleasesByTag(ctx context.Context, log *zap.SugaredLogger, ghClient *github.Client, repo, tag string) ([]*github.RepositoryRelease, error) {
+func getAllReleasesByTag(ctx context.Context, ghClient *github.Client, repo, tag string) ([]*github.RepositoryRelease, error) {
 	var (
-		releases = make([]*github.RepositoryRelease, len(PlatformValues()))
+		releases = make([]*github.RepositoryRelease, len(gapps.PlatformValues()))
 		release  *github.RepositoryRelease
 		resp     *github.Response
 		count    int
@@ -166,7 +167,7 @@ func getAllReleasesByTag(ctx context.Context, log *zap.SugaredLogger, ghClient *
 		tag = CurrentStorageKey
 	}
 
-	for _, platform := range PlatformValues() {
+	for _, platform := range gapps.PlatformValues() {
 		if tag == CurrentStorageKey {
 			release, resp, err = ghClient.Repositories.GetLatestRelease(ctx, repo, platform.String())
 		} else {
