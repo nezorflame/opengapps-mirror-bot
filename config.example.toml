@@ -1,4 +1,3 @@
-tracing = false
 max_downloads = 10
 
 [db]
@@ -22,6 +21,11 @@ token = "your_github_token"
 [telegram]
 token = "YOUR:TELEGRAMBOTTOKEN"
 timeout = 60
+
+[commands]
+start = "/start"
+help = "/help"
+mirror = "/mirror"
 
 [messages]
 hello = "Greetings, my friend!\nPlease use the /mirror command to get the OpenGApps package mirror.\nUse /help command if you need any assistance.\nFor any questions, feel free to contact the admin."
