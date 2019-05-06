@@ -19,7 +19,6 @@ const (
 
 var mandatoryParams = []string{
 	"max_downloads",
-	"db.path",
 	"gapps.time_format",
 	"gapps.prefix",
 	"gapps.local_path",
@@ -66,6 +65,7 @@ func New(name string) (*viper.Viper, error) {
 	}
 	cfg.WatchConfig()
 
+	cfg.SetDefault("db.path", defaultDBPath)
 	cfg.SetDefault("db.timeout", defaultDBTimeout)
 	cfg.SetDefault("gapps.renew_period", defaultGAppsRenewPeriod)
 	cfg.SetDefault("telegram.timeout", defaultTelegramTimeout)

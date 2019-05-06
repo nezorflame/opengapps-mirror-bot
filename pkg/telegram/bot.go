@@ -181,7 +181,7 @@ func (b *Bot) mirror(msg *tgbotapi.Message) {
 
 func (b *Bot) reply(chatID int64, msgID int, text string) {
 	log.WithField("chat_id", chatID).WithField("msg_id", msgID).Debug("Sending reply")
-	msg := tgbotapi.NewMessage(chatID, fmt.Sprintf(text))
+	msg := tgbotapi.NewMessage(chatID, fmt.Sprint(text))
 	if msgID != 0 {
 		msg.ReplyToMessageID = msgID
 	}
