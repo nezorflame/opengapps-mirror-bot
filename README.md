@@ -2,23 +2,22 @@
 
 This is a Telegram bot which allows you to create a locally and remotely hosted mirrors for any existing OpenGApps package.
 
-Requires Go 1.10+ for [go modules](https://github.com/golang/go/wiki/Modules) support.
+Requires Go 1.10+ for [Go modules](https://github.com/golang/go/wiki/Modules) support.
 
 Based on a great [tgbotapi](https://github.com/go-telegram-bot-api/telegram-bot-api) package with the help of [go-github](https://github.com/google/go-github) package to browse Github repos.
 
 ## Install
 
-1. Get the bot:
-    ```bash
-    go get github.com/nezorflame/opengapps-mirror-bot
-    cd $GOPATH/src/github.com/nezorflame/opengapps-mirror-bot
-    ```
-2. Install the dependencies and the bot itself:
-    - with `vgo`:
-    ```bash
-    export GO111MODULE=on
-    go install
-    ```
+This project uses Go modules.
+To install it, starting with Go 1.12 you can just use `go get`:
+
+`go get opengapps-mirror-bot`
+
+or
+
+`go install opengapps-mirror-bot`
+
+Also you can just clone this repo and use the build/install targets from `Makefile`.
 
 ## Usage
 

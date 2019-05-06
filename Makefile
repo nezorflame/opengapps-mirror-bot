@@ -21,7 +21,7 @@ deps:
 .PHONY: test
 test:
 	$(info #Running tests...)
-	go test -v -cover -race ./...
+	go test -v -race ./...
 
 # run all tests with coverage
 .PHONY: test-cover
