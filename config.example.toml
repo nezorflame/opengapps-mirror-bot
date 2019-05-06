@@ -21,6 +21,7 @@ token = "your_github_token"
 [telegram]
 token = "YOUR:TELEGRAMBOTTOKEN"
 timeout = 60
+debug = false
 
 [commands]
 start = "/start"

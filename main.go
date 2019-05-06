@@ -83,7 +83,7 @@ func main() {
 
 	// init package watcher
 	log.Info("Initiating GApps package watcher")
-	go func(ctx context.Context) {
+	go func() {
 		ticker := time.NewTicker(cfg.GetDuration("gapps.renew_period"))
 		for {
 			select {
@@ -98,7 +98,7 @@ func main() {
 				return
 			}
 		}
-	}(ctx)
+	}()
 
 	// create bot
 	bot, err := telegram.NewBot(ctx, cfg, dq, gs, gh)

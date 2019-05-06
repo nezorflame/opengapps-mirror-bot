@@ -13,23 +13,21 @@ const (
 	defaultDBPath           = "./bolt.db"
 	defaultDBTimeout        = time.Second
 	defaultTelegramTimeout  = 60
+	defaultTelegramDebug    = false
 	defaultGAppsRenewPeriod = time.Minute
 )
 
 var mandatoryParams = []string{
 	"max_downloads",
 	"db.path",
-	"db.timeout",
 	"gapps.time_format",
 	"gapps.prefix",
-	"gapps.renew_period",
 	"gapps.local_path",
 	"gapps.local_url",
 	"gapps.local_host",
 	"github.repo",
 	"github.token",
 	"telegram.token",
-	"telegram.timeout",
 	"commands.start",
 	"commands.help",
 	"commands.mirror",
@@ -71,6 +69,7 @@ func New(name string) (*viper.Viper, error) {
 	cfg.SetDefault("db.timeout", defaultDBTimeout)
 	cfg.SetDefault("gapps.renew_period", defaultGAppsRenewPeriod)
 	cfg.SetDefault("telegram.timeout", defaultTelegramTimeout)
+	cfg.SetDefault("telegram.debug", defaultTelegramDebug)
 
 	if err := validateConfig(cfg); err != nil {
 		return nil, errors.Wrap(err, "unable to validate config")
