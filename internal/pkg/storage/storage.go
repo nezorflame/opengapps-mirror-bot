@@ -43,7 +43,7 @@ func GetPackageStorage(ctx context.Context, ghClient *github.Client, dq *net.Dow
 		Packages: make(map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package, len(releases)),
 	}
 	for _, release := range releases {
-		log.Debugf("Working with release '%s'", release)
+		log.Debugf("Working with release '%s'", *release.Name)
 		zipSlice := make([]github.ReleaseAsset, 0, len(release.Assets))
 		md5Slice := make([]github.ReleaseAsset, 0, len(release.Assets))
 
