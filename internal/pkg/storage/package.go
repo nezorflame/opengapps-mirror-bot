@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -68,7 +69,7 @@ func (p *Package) CreateMirror(dq *net.DownloadQueue, cfg *viper.Viper) error {
 
 	// if we have remote_url set, send the file to remote URL
 	if remoteURL := cfg.GetString("gapps.remote_url"); remoteURL != "" {
-		tmpFile, err := os.Open(filePath)
+		tmpFile, err := os.Open(filepath.Clean(filePath))
 		if err != nil {
 			return errors.Wrap(err, "unable to create temp file")
 		}
@@ -105,6 +106,8 @@ func (p *Package) CreateMirror(dq *net.DownloadQueue, cfg *viper.Viper) error {
 
 func (p *Package) move(origin, destFolder string) (string, error) {
 	path := destFolder + p.Platform.String() + "/" + p.Date
+
+	//nolint:gosec
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", errors.Wrap(err, "unable to create folder")
 	}
@@ -114,6 +117,7 @@ func (p *Package) move(origin, destFolder string) (string, error) {
 		return "", errors.Wrap(err, "unable to move file")
 	}
 
+	//nolint:gosec
 	if err := os.Chmod(path, 0755); err != nil {
 		return "", errors.Wrap(err, "unable to set file permissions")
 	}
@@ -141,7 +145,7 @@ func getMD5(dq *net.DownloadQueue, url string) (string, error) {
 		return "", errors.Wrap(err, "unable to download MD5 file")
 	}
 
-	file, err := os.Open(filePath)
+	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
 		return "", errors.Wrap(err, "unable to open MD5 file")
 	}

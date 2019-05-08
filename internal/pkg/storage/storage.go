@@ -36,9 +36,14 @@ func GetPackageStorage(ctx context.Context, ghClient *github.Client, dq *net.Dow
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get latest releases from Github")
 	}
+	log.Debugf("Got %d releases", len(releases))
 
-	storage := &Storage{Packages: make(map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package, len(releases))}
+	storage := &Storage{
+		Date:     releaseTag,
+		Packages: make(map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package, len(releases)),
+	}
 	for _, release := range releases {
+		log.Debugf("Working with release '%s'", release)
 		zipSlice := make([]github.ReleaseAsset, 0, len(release.Assets))
 		md5Slice := make([]github.ReleaseAsset, 0, len(release.Assets))
 
@@ -87,9 +92,6 @@ func (s *Storage) Add(p *Package) {
 		s.Count++
 		s.Packages[p.Platform][p.Android][p.Variant] = p
 	}
-	if s.Date == "" {
-		s.Date = p.Date
-	}
 	s.mtx.Unlock()
 }
 
@@ -127,14 +129,14 @@ func (s *Storage) Save() error {
 
 	body, err := json.Marshal(s)
 	if err != nil {
-		return errors.Wrapf(err, "unable to marshal storage %s", s.Date)
+		return errors.Wrapf(err, "unable to marshal storage '%s'", s.Date)
 	}
 	if body == nil {
-		return errors.Errorf("storage %s is empty", s.Date)
+		return errors.Errorf("storage '%s' is empty", s.Date)
 	}
 
 	if err = s.cache.Put(s.Date, body); err != nil {
-		return errors.Wrapf(err, "unable to save storage %s to cache: %v", s.Date, err)
+		return errors.Wrapf(err, "unable to save storage '%s' to cache: %v", s.Date, err)
 	}
 	return nil
 }
@@ -157,10 +159,9 @@ func GetLatestReleaseDate(ctx context.Context, ghClient *github.Client, repo str
 
 func getAllReleasesByTag(ctx context.Context, ghClient *github.Client, repo, tag string) ([]*github.RepositoryRelease, error) {
 	var (
-		releases = make([]*github.RepositoryRelease, len(gapps.PlatformValues()))
+		releases []*github.RepositoryRelease
 		release  *github.RepositoryRelease
 		resp     *github.Response
-		count    int
 		err      error
 	)
 	if tag == "" {
@@ -186,11 +187,10 @@ func getAllReleasesByTag(ctx context.Context, ghClient *github.Client, repo, tag
 			log.Error("Unable to get release from Github with bad response: release is nil")
 			continue
 		}
-		releases[count] = release
-		count++
+		releases = append(releases, release)
 	}
-	if count == 0 {
+	if len(releases) == 0 {
 		return nil, errors.New("no releases available")
 	}
-	return releases[:count-1], nil
+	return releases, nil
 }
