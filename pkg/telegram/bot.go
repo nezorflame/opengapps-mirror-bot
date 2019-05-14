@@ -128,7 +128,6 @@ func (b *Bot) mirror(msg *tgbotapi.Message) {
 	if !ok {
 		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.GetString("messages.mirror.in_progress"))
 
-		var err error
 		if s, err = storage.GetPackageStorage(b.ctx, b.gh, b.dq, b.cfg, date); err != nil {
 			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.GetString("messages.errors.unknown"))
 			logger.Fatal("No current storage available")
@@ -140,8 +139,28 @@ func (b *Bot) mirror(msg *tgbotapi.Message) {
 	// look up the package
 	pkg, ok := s.Get(platform, android, variant)
 	if !ok {
-		b.reply(msg.Chat.ID, msg.MessageID, b.cfg.GetString("messages.mirror.not_found"))
-		return
+		// try to reform the package
+		var st *storage.Storage
+		if st, err = storage.GetPackageStorage(b.ctx, b.gh, b.dq, b.cfg, date); err == nil {
+			s, ok = storage.MergeStoragePackages(s, st)
+			if ok {
+				if err = s.Save(); err == nil {
+					pkg, ok = s.Get(platform, android, variant)
+					if !ok {
+						err = errors.New("package is missing from the updated storage")
+					}
+				}
+			} else {
+				err = errors.New("package is missing from the storage despite the update")
+			}
+		}
+
+		// report error and exit
+		if err != nil {
+			logger.WithError(err).Error("Unable to get the package")
+			b.reply(msg.Chat.ID, msg.MessageID, b.cfg.GetString("messages.mirror.not_found"))
+			return
+		}
 	}
 
 	// check if we already have mirrors

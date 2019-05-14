@@ -30,55 +30,6 @@ type Storage struct {
 	mtx      sync.RWMutex
 }
 
-// GetPackageStorage creates and fills a new Storage
-func GetPackageStorage(ctx context.Context, ghClient *github.Client, dq *net.DownloadQueue, cfg *viper.Viper, releaseTag string) (*Storage, error) {
-	releases, err := getAllReleasesByTag(ctx, ghClient, cfg.GetString("github.repo"), releaseTag)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get latest releases from Github")
-	}
-	log.Debugf("Got %d releases", len(releases))
-
-	storage := &Storage{
-		Date:     releaseTag,
-		Packages: make(map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package, len(releases)),
-	}
-	for _, release := range releases {
-		log.Debugf("Working with release '%s'", *release.Name)
-		zipSlice := make([]github.ReleaseAsset, 0, len(release.Assets))
-		md5Slice := make([]github.ReleaseAsset, 0, len(release.Assets))
-
-		// Sort out zip and MD5's
-		for _, asset := range release.Assets {
-			name := asset.GetName()
-			if strings.HasSuffix(name, "zip") {
-				zipSlice = append(zipSlice, asset)
-			}
-
-			if strings.HasSuffix(name, "md5") {
-				md5Slice = append(md5Slice, asset)
-			}
-		}
-
-		// Sort out Packages and fill MD5's
-		var wg sync.WaitGroup
-		wg.Add(len(zipSlice))
-		for i := 0; i < len(zipSlice); i++ {
-			go func(wg *sync.WaitGroup, i int) {
-				defer wg.Done()
-				p, err := formPackage(dq, cfg, zipSlice[i], md5Slice[i])
-				if err != nil {
-					log.Errorf("Unable to form package: %v", err)
-					return
-				}
-				storage.Add(p)
-			}(&wg, i)
-		}
-		wg.Wait()
-	}
-
-	return storage, nil
-}
-
 // Add safely adds a new package to the Storage
 func (s *Storage) Add(p *Package) {
 	s.mtx.Lock()
@@ -139,6 +90,77 @@ func (s *Storage) Save() error {
 		return errors.Wrapf(err, "unable to save storage '%s' to cache: %v", s.Date, err)
 	}
 	return nil
+}
+
+// GetPackageStorage creates and fills a new Storage
+func GetPackageStorage(ctx context.Context, ghClient *github.Client, dq *net.DownloadQueue, cfg *viper.Viper, releaseTag string) (*Storage, error) {
+	releases, err := getAllReleasesByTag(ctx, ghClient, cfg.GetString("github.repo"), releaseTag)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get latest releases from Github")
+	}
+	log.Debugf("Got %d releases", len(releases))
+
+	storage := &Storage{
+		Date:     releaseTag,
+		Packages: make(map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package, len(releases)),
+	}
+	for _, release := range releases {
+		log.Debugf("Working with release '%s'", *release.Name)
+		zipSlice := make([]github.ReleaseAsset, 0, len(release.Assets))
+		md5Slice := make([]github.ReleaseAsset, 0, len(release.Assets))
+
+		// Sort out zip and MD5's
+		for _, asset := range release.Assets {
+			name := asset.GetName()
+			if strings.HasSuffix(name, "zip") {
+				zipSlice = append(zipSlice, asset)
+			}
+
+			if strings.HasSuffix(name, "md5") {
+				md5Slice = append(md5Slice, asset)
+			}
+		}
+
+		// Sort out Packages and fill MD5's
+		var wg sync.WaitGroup
+		wg.Add(len(zipSlice))
+		for i := 0; i < len(zipSlice); i++ {
+			go func(wg *sync.WaitGroup, i int) {
+				defer wg.Done()
+				p, err := formPackage(dq, cfg, zipSlice[i], md5Slice[i])
+				if err != nil {
+					log.Errorf("Unable to form package: %v", err)
+					return
+				}
+				storage.Add(p)
+			}(&wg, i)
+		}
+		wg.Wait()
+	}
+
+	return storage, nil
+}
+
+// MergeStoragePackages helps to fill missing platforms
+func MergeStoragePackages(old, new *Storage) (*Storage, bool) {
+	old.mtx.Lock()
+	defer old.mtx.Unlock()
+	new.mtx.RLock()
+	defer new.mtx.RUnlock()
+
+	if len(old.Packages) >= len(new.Packages) {
+		return old, false
+	}
+
+	for platform := range new.Packages {
+		_, ok := old.Packages[platform]
+		if ok {
+			continue
+		}
+		old.Packages[platform] = new.Packages[platform]
+	}
+
+	return old, true
 }
 
 // GetLatestReleaseDate returns the date for the latest OpenGApps release
