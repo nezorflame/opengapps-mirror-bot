@@ -29,6 +29,12 @@ const (
 	Android90
 )
 
+// HumanString is required for human-readable Android version with . delimiter
+func (a Android) HumanString() string {
+	result := a.String()
+	return result[:len(result)-1] + "." + result[len(result)-1:]
+}
+
 // Variant is an enum for different package variations
 type Variant uint
 
