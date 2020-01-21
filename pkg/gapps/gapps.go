@@ -1,6 +1,8 @@
 package gapps
 
-import "github.com/pkg/errors"
+import (
+	"fmt"
+)
 
 // Platform is an enum for different chip architectures
 type Platform uint
@@ -27,6 +29,7 @@ const (
 	Android80
 	Android81
 	Android90
+	Android100
 )
 
 // HumanString is required for human-readable Android version with . delimiter
@@ -51,27 +54,27 @@ const (
 	VariantAroma
 )
 
-const parsingErrText = "parsing error"
+const parsingErrText = "parsing error: %w"
 
 // ParsePackageParts helps to parse package info args into proper parts
 func ParsePackageParts(args []string) (Platform, Android, Variant, error) {
 	if len(args) != 3 {
-		return 0, 0, 0, errors.Errorf("bad number of arguments: want 4, got %d", len(args))
+		return 0, 0, 0, fmt.Errorf("bad number of arguments: want 4, got %d", len(args))
 	}
 
 	platform, err := PlatformString(args[0])
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, parsingErrText)
+		return 0, 0, 0, fmt.Errorf(parsingErrText, err)
 	}
 
 	android, err := AndroidString(args[1])
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, parsingErrText)
+		return 0, 0, 0, fmt.Errorf(parsingErrText, err)
 	}
 
 	variant, err := VariantString(args[2])
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, parsingErrText)
+		return 0, 0, 0, fmt.Errorf(parsingErrText, err)
 	}
 
 	return platform, android, variant, nil
