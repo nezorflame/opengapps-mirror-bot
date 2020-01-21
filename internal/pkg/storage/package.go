@@ -11,8 +11,7 @@ import (
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/gapps"
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
 
-	"github.com/google/go-github/v25/github"
-	"github.com/pkg/errors"
+	"github.com/google/go-github/v29/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -43,14 +42,14 @@ func (p *Package) CreateMirror(dq *net.DownloadQueue, cfg *viper.Viper) error {
 	// download the file
 	filePath, err := dq.AddMultiple(p.OriginURL, p.MD5, 20, p.Size)
 	if err != nil {
-		return errors.Wrap(err, "unable to read file body")
+		return fmt.Errorf("unable to read file body: %w", err)
 	}
 	log.Debugf("Package downloaded to %s", filePath)
 
 	// if we have local_path set, save the file there
 	if localPath := cfg.GetString("gapps.local_path"); localPath != "" {
 		if filePath, err = p.move(filePath, localPath); err != nil {
-			return errors.Wrap(err, "unable to move the file to storage")
+			return fmt.Errorf("unable to move the file to storage: %w", err)
 		}
 		log.Debugf("Package moved to %s", filePath)
 
@@ -70,30 +69,30 @@ func (p *Package) CreateMirror(dq *net.DownloadQueue, cfg *viper.Viper) error {
 	if remoteURL := cfg.GetString("gapps.remote_url"); remoteURL != "" {
 		tmpFile, err := os.Open(filePath)
 		if err != nil {
-			return errors.Wrap(err, "unable to create temp file")
+			return fmt.Errorf("unable to create temp file: %w", err)
 		}
 		defer tmpFile.Close()
 
 		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(remoteURL, p.Name), tmpFile)
 		if err != nil {
-			return errors.Wrap(err, "unable to create upload request")
+			return fmt.Errorf("unable to create upload request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/zip")
 		req.Header.Set("Max-Days", "7")
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return errors.Wrap(err, "unable to make upload request")
+			return fmt.Errorf("unable to make upload request: %w", err)
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			return errors.Errorf("unable to make upload request: %v", resp.Status)
+			return fmt.Errorf("unable to make upload request: %v", resp.Status)
 		}
 
 		result, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return errors.Wrap(err, "unable to read mirror response body")
+			return fmt.Errorf("unable to read mirror response body: %w", err)
 		}
 
 		p.RemoteURL = string(result)
@@ -106,16 +105,16 @@ func (p *Package) CreateMirror(dq *net.DownloadQueue, cfg *viper.Viper) error {
 func (p *Package) move(origin, destFolder string) (string, error) {
 	path := destFolder + p.Platform.String() + "/" + p.Date
 	if err := os.MkdirAll(path, 0755); err != nil {
-		return "", errors.Wrap(err, "unable to create folder")
+		return "", fmt.Errorf("unable to create folder: %w", err)
 	}
 
 	path += "/" + p.Name
 	if err := os.Rename(origin, path); err != nil {
-		return "", errors.Wrap(err, "unable to move file")
+		return "", fmt.Errorf("unable to move file: %w", err)
 	}
 
 	if err := os.Chmod(path, 0755); err != nil {
-		return "", errors.Wrap(err, "unable to set file permissions")
+		return "", fmt.Errorf("unable to set file permissions: %w", err)
 	}
 
 	return path, nil
@@ -124,12 +123,12 @@ func (p *Package) move(origin, destFolder string) (string, error) {
 func formPackage(dq *net.DownloadQueue, cfg *viper.Viper, zipAsset, md5Asset github.ReleaseAsset) (*Package, error) {
 	md5sum, err := getMD5(dq, md5Asset.GetBrowserDownloadURL())
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to download md5")
+		return nil, fmt.Errorf("unable to download md5: %w", err)
 	}
 
 	p, err := parseAsset(cfg, zipAsset, md5sum)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create package")
+		return nil, fmt.Errorf("unable to create package: %w", err)
 	}
 
 	return p, nil
@@ -138,18 +137,18 @@ func formPackage(dq *net.DownloadQueue, cfg *viper.Viper, zipAsset, md5Asset git
 func getMD5(dq *net.DownloadQueue, url string) (string, error) {
 	filePath, err := dq.AddSingle(url)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to download MD5 file")
+		return "", fmt.Errorf("unable to download MD5 file: %w", err)
 	}
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to open MD5 file")
+		return "", fmt.Errorf("unable to open MD5 file: %w", err)
 	}
 	defer file.Close()
 
 	result, err := ioutil.ReadAll(file)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to read MD5 file")
+		return "", fmt.Errorf("unable to read MD5 file: %w", err)
 	}
 
 	return strings.Split(string(result), "  ")[0], nil
@@ -161,17 +160,17 @@ func parseAsset(cfg *viper.Viper, asset github.ReleaseAsset, md5Sum string) (*Pa
 	name := asset.GetName()
 	parts := strings.Split(strings.TrimPrefix(name, cfg.GetString("gapps.prefix")+gappsSeparator), ".")
 	if len(parts) != 3 {
-		return nil, errors.Errorf("incorrect package name: %s", name)
+		return nil, fmt.Errorf("incorrect package name: %s", name)
 	}
 
 	path, ext := parts[0]+parts[1], parts[2]
 	if ext != "zip" {
-		return nil, errors.Errorf("incorrect package extension: %s", ext)
+		return nil, fmt.Errorf("incorrect package extension: %s", ext)
 	}
 
 	parts = strings.Split(path, gappsSeparator)
 	if len(parts) != 4 {
-		return nil, errors.Errorf("incorrect package name: %s", name)
+		return nil, fmt.Errorf("incorrect package name: %s", name)
 	}
 
 	platform, android, variant, err := gapps.ParsePackageParts(parts[:3])
@@ -180,7 +179,7 @@ func parseAsset(cfg *viper.Viper, asset github.ReleaseAsset, md5Sum string) (*Pa
 	}
 
 	if _, err = time.Parse(cfg.GetString("gapps.time_format"), parts[3]); err != nil {
-		return nil, errors.Wrap(err, "unable to parse time")
+		return nil, fmt.Errorf("unable to parse time: %w", err)
 	}
 
 	return &Package{

@@ -3,13 +3,14 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
 
-	"github.com/google/go-github/v25/github"
-	"github.com/pkg/errors"
+	"github.com/google/go-github/v29/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -34,7 +35,7 @@ type Storage struct {
 func GetPackageStorage(ctx context.Context, ghClient *github.Client, dq *net.DownloadQueue, cfg *viper.Viper, releaseTag string) (*Storage, error) {
 	releases, err := getAllReleasesByTag(ctx, ghClient, cfg.GetString("github.repo"), releaseTag)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get latest releases from Github")
+		return nil, fmt.Errorf("unable to get latest releases from Github: %w", err)
 	}
 
 	storage := &Storage{Packages: make(map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package, len(releases))}
@@ -115,9 +116,7 @@ func (s *Storage) Delete(p *Package) {
 		return
 	}
 
-	if _, ok := s.Packages[p.Platform][p.Android][p.Variant]; ok {
-		delete(s.Packages[p.Platform][p.Android], p.Variant)
-	}
+	delete(s.Packages[p.Platform][p.Android], p.Variant)
 }
 
 // Save saves the Storage to the cache
@@ -127,14 +126,14 @@ func (s *Storage) Save() error {
 
 	body, err := json.Marshal(s)
 	if err != nil {
-		return errors.Wrapf(err, "unable to marshal storage %s", s.Date)
+		return fmt.Errorf("unable to marshal storage %s: %w", s.Date, err)
 	}
 	if body == nil {
-		return errors.Errorf("storage %s is empty", s.Date)
+		return fmt.Errorf("storage %s is empty", s.Date)
 	}
 
 	if err = s.cache.Put(s.Date, body); err != nil {
-		return errors.Wrapf(err, "unable to save storage %s to cache: %v", s.Date, err)
+		return fmt.Errorf("unable to save storage %s to cache: %w", s.Date, err)
 	}
 	return nil
 }
@@ -143,7 +142,7 @@ func (s *Storage) Save() error {
 func GetLatestReleaseDate(ctx context.Context, ghClient *github.Client, repo string) (string, error) {
 	releases, err := getAllReleasesByTag(ctx, ghClient, repo, CurrentStorageKey)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to get latest releases from Github")
+		return "", fmt.Errorf("unable to get latest releases from Github: %w", err)
 	}
 
 	releaseDates := make([]string, len(releases))

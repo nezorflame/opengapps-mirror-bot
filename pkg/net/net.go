@@ -2,6 +2,7 @@ package net
 
 import (
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,7 +11,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,13 +33,13 @@ func (dq *DownloadQueue) AddSingle(url string) (string, error) {
 
 	resp, err := http.DefaultClient.Get(url)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to make GET request")
+		return "", fmt.Errorf("unable to make GET request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	tmpFile, err := createTmpFile(resp.Body)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to create result file")
+		return "", fmt.Errorf("unable to create result file: %w", err)
 	}
 
 	return tmpFile.Name(), nil
@@ -67,7 +67,7 @@ func (dq *DownloadQueue) AddMultiple(url, md5sum string, limit, size int) (strin
 
 	if md5sum != "" {
 		if check, err := checkMD5(result, md5sum); err != nil {
-			return "", errors.Wrap(err, "unable to check MD5 checksum")
+			return "", fmt.Errorf("unable to check MD5 checksum: %w", err)
 		} else if !check {
 			return "", errors.New("checksum mismatch")
 		}
@@ -117,7 +117,7 @@ func (dq *DownloadQueue) multi(url string, size, limit int) (string, error) {
 
 	tmpFileName, err := joinFiles(tmpFileNames)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to create result file")
+		return "", fmt.Errorf("unable to create result file: %w", err)
 	}
 
 	return tmpFileName, nil
@@ -134,13 +134,13 @@ func (dq *DownloadQueue) release() {
 func createTmpFile(content io.Reader) (*os.File, error) {
 	file, err := ioutil.TempFile("", "*")
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create file")
+		return nil, fmt.Errorf("unable to create file: %w", err)
 	}
 
 	if content != nil {
 		if _, err = io.Copy(file, content); err != nil {
 			file.Close()
-			return nil, errors.Wrap(err, "unable to write file content")
+			return nil, fmt.Errorf("unable to write file content: %w", err)
 		}
 	}
 	return file, nil
@@ -157,20 +157,20 @@ func joinFiles(filepaths []string) (string, error) {
 
 	dest, err := os.OpenFile(filepaths[0], os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to open destination file")
+		return "", fmt.Errorf("unable to open destination file: %w", err)
 	}
 	defer dest.Close()
 
 	var source *os.File
 	for i := 1; i < len(filepaths); i++ {
 		if source, err = os.Open(filepaths[i]); err != nil {
-			return "", errors.Wrap(err, "unable to open destination file")
+			return "", fmt.Errorf("unable to open destination file: %w", err)
 		}
 		_, err := io.Copy(dest, source)
 		_ = source.Close()
 		_ = os.Remove(filepaths[i])
 		if err != nil {
-			return "", errors.Wrapf(err, "unable to append source file %d to destination", i)
+			return "", fmt.Errorf("unable to append source file %d to destination: %w", i, err)
 		}
 	}
 	return filepaths[0], nil
@@ -179,13 +179,13 @@ func joinFiles(filepaths []string) (string, error) {
 func checkMD5(path, md5sum string) (bool, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to open the file")
+		return false, fmt.Errorf("unable to open the file: %w", err)
 	}
 	defer file.Close()
 
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
-		return false, errors.Wrap(err, "unable to read the file")
+		return false, fmt.Errorf("unable to read the file: %w", err)
 	}
 
 	result := fmt.Sprintf("%x", md5.Sum(content))
