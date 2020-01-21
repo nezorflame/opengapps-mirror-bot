@@ -3,13 +3,13 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/nezorflame/opengapps-mirror-bot/internal/pkg/db"
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
 
-	"github.com/google/go-github/v25/github"
-	"github.com/pkg/errors"
+	"github.com/google/go-github/v29/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -33,7 +33,7 @@ func NewGlobalStorage(cache *db.DB) *GlobalStorage {
 func (gs *GlobalStorage) AddLatestStorage(ctx context.Context, ghClient *github.Client, dq *net.DownloadQueue, cfg *viper.Viper) error {
 	releaseDate, err := GetLatestReleaseDate(ctx, ghClient, cfg.GetString("github.repo"))
 	if err != nil {
-		return errors.Wrap(err, "unable to get latest release date")
+		return fmt.Errorf("unable to get latest release date: %w", err)
 	}
 	logger := log.WithField("release_date", releaseDate)
 	logger.Debugf("Got the newest release date")
@@ -44,12 +44,12 @@ func (gs *GlobalStorage) AddLatestStorage(ctx context.Context, ghClient *github.
 	if !ok {
 		logger.Info("Storage not found, creating a new one")
 		if s, err = GetPackageStorage(ctx, ghClient, dq, cfg, releaseDate); err != nil {
-			return errors.Wrap(err, "unable to get current package storage")
+			return fmt.Errorf("unable to get current package storage: %w", err)
 		}
 		logger.Debug("Saving the storage")
 		gs.Add(s.Date, s)
 		if err = s.Save(); err != nil {
-			return errors.Wrap(err, "unable to save new storage")
+			return fmt.Errorf("unable to save new storage: %w", err)
 		}
 		logger.Debug("Storage added successfully")
 	}
@@ -102,7 +102,7 @@ func (gs *GlobalStorage) Load() error {
 	// check the cache first
 	cachedStorageList, err := gs.cache.Keys()
 	if err != nil {
-		return errors.Wrap(err, "unable to load storage list from cache")
+		return fmt.Errorf("unable to load storage list from cache: %w", err)
 	}
 	log.Debug("Got the release keys: ", cachedStorageList)
 
@@ -123,7 +123,7 @@ func (gs *GlobalStorage) Load() error {
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "unable to load one of the storages")
+		return fmt.Errorf("unable to load one of the storages: %w", err)
 	}
 	return nil
 }

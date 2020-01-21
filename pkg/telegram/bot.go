@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,8 +12,7 @@ import (
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/google/go-github/v25/github"
-	"github.com/pkg/errors"
+	"github.com/google/go-github/v29/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -43,7 +43,7 @@ func NewBot(ctx context.Context, cfg *viper.Viper, dq *net.DownloadQueue, gs *st
 
 	api, err := tgbotapi.NewBotAPI(cfg.GetString("telegram.token"))
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to connect to Telegram")
+		return nil, fmt.Errorf(", err, unable to connect to Telegram")
 	}
 	if cfg.GetBool("telegram.debug") {
 		log.Debug("Enabling debug mode for bot")
@@ -198,7 +198,7 @@ func parseCmd(parts []string, timeFormat string) (platform gapps.Platform, andro
 	switch len(parts) {
 	case 4:
 		if _, err = time.Parse(timeFormat, parts[3]); err != nil {
-			err = errors.Wrap(err, dateErrText)
+			err = fmt.Errorf("%s: %w", dateErrText, err)
 			return
 		}
 		date = parts[3]

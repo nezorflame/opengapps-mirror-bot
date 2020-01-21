@@ -1,5 +1,4 @@
-# opengapps-mirror-bot [![CircleCI](https://circleci.com/gh/nezorflame/opengapps-mirror-bot/tree/master.svg?style=svg)](https://circleci.com/gh/nezorflame/opengapps-mirror-bot/tree/master) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/opengapps-mirror-bot)](https://goreportcard.com/report/github.com/nezorflame/opengapps-mirror-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/opengapps-mirror-bot.svg)](https://golangci.com/r/github.com/nezorflame/opengapps-mirror-bot)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-mirror-bot.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-mirror-bot?ref=badge_shield)
+# opengapps-mirror-bot [![CircleCI](https://circleci.com/gh/nezorflame/opengapps-mirror-bot/tree/master.svg?style=svg)](https://circleci.com/gh/nezorflame/opengapps-mirror-bot/tree/master) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/opengapps-mirror-bot)](https://goreportcard.com/report/github.com/nezorflame/opengapps-mirror-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/opengapps-mirror-bot.svg)](https://golangci.com/r/github.com/nezorflame/opengapps-mirror-bot) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-mirror-bot.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-mirror-bot?ref=badge_shield)
 
 This is a Telegram bot which allows you to create a locally and remotely hosted mirrors for any existing OpenGApps package.
 
@@ -51,8 +50,6 @@ Targets should be put after the `/mirror` command with space character between t
 - Android version: `4.4`...`9.0`
 - package variant: `pico`|`nano`|`micro`|`mini`|`full`|`stock`|`super`|`aroma`|`tvstock`
 - (optional) date of the release: `YYYYMMDD`
-
-
 
 ## License
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-mirror-bot.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-mirror-bot?ref=badge_large)
