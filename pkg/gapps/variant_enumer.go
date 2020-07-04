@@ -8,9 +8,9 @@ import (
 	"fmt"
 )
 
-const _VariantName = "tvstockpiconanomicrominifullstocksuperaroma"
+const _VariantName = "tvstockpiconanomicrominifullstocksuperaromatvmini"
 
-var _VariantIndex = [...]uint8{0, 7, 11, 15, 20, 24, 28, 33, 38, 43}
+var _VariantIndex = [...]uint8{0, 7, 11, 15, 20, 24, 28, 33, 38, 43, 49}
 
 func (i Variant) String() string {
 	if i >= Variant(len(_VariantIndex)-1) {
@@ -19,7 +19,7 @@ func (i Variant) String() string {
 	return _VariantName[_VariantIndex[i]:_VariantIndex[i+1]]
 }
 
-var _VariantValues = []Variant{0, 1, 2, 3, 4, 5, 6, 7, 8}
+var _VariantValues = []Variant{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
 var _VariantNameToValueMap = map[string]Variant{
 	_VariantName[0:7]:   0,
@@ -31,6 +31,7 @@ var _VariantNameToValueMap = map[string]Variant{
 	_VariantName[28:33]: 6,
 	_VariantName[33:38]: 7,
 	_VariantName[38:43]: 8,
+	_VariantName[43:49]: 9,
 }
 
 // VariantString retrieves an enum value from the enum constants string name.

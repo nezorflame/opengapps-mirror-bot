@@ -11,7 +11,7 @@ import (
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/gapps"
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
 
-	"github.com/google/go-github/v29/github"
+	"github.com/google/go-github/v32/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -120,7 +120,7 @@ func (p *Package) move(origin, destFolder string) (string, error) {
 	return path, nil
 }
 
-func formPackage(dq *net.DownloadQueue, cfg *viper.Viper, zipAsset, md5Asset github.ReleaseAsset) (*Package, error) {
+func formPackage(dq *net.DownloadQueue, cfg *viper.Viper, zipAsset, md5Asset *github.ReleaseAsset) (*Package, error) {
 	md5sum, err := getMD5(dq, md5Asset.GetBrowserDownloadURL())
 	if err != nil {
 		return nil, fmt.Errorf("unable to download md5: %w", err)
@@ -156,7 +156,7 @@ func getMD5(dq *net.DownloadQueue, url string) (string, error) {
 
 // Package name format is as follows:
 // open_gapps-Platform-Android-Variant-Date.zip
-func parseAsset(cfg *viper.Viper, asset github.ReleaseAsset, md5Sum string) (*Package, error) {
+func parseAsset(cfg *viper.Viper, asset *github.ReleaseAsset, md5Sum string) (*Package, error) {
 	name := asset.GetName()
 	parts := strings.Split(strings.TrimPrefix(name, cfg.GetString("gapps.prefix")+gappsSeparator), ".")
 	if len(parts) != 3 {

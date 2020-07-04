@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/go-github/v29/github"
+	"github.com/google/go-github/v32/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -40,11 +40,15 @@ func GetPackageStorage(ctx context.Context, ghClient *github.Client, dq *net.Dow
 
 	storage := &Storage{Packages: make(map[gapps.Platform]map[gapps.Android]map[gapps.Variant]*Package, len(releases))}
 	for _, release := range releases {
-		zipSlice := make([]github.ReleaseAsset, 0, len(release.Assets))
-		md5Slice := make([]github.ReleaseAsset, 0, len(release.Assets))
+		zipSlice := make([]*github.ReleaseAsset, 0, len(release.Assets))
+		md5Slice := make([]*github.ReleaseAsset, 0, len(release.Assets))
 
 		// Sort out zip and MD5's
 		for _, asset := range release.Assets {
+			if asset == nil {
+				continue
+			}
+
 			name := asset.GetName()
 			if strings.HasSuffix(name, "zip") {
 				zipSlice = append(zipSlice, asset)

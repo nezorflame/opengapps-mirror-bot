@@ -12,7 +12,7 @@ import (
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/google/go-github/v29/github"
+	"github.com/google/go-github/v32/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )

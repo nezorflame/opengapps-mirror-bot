@@ -52,6 +52,7 @@ const (
 	VariantStock
 	VariantSuper
 	VariantAroma
+	VariantTvmini
 )
 
 const parsingErrText = "parsing error: %w"
