@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v37/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
