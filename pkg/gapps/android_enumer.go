@@ -8,9 +8,9 @@ import (
 	"fmt"
 )
 
-const _AndroidName = "445051607071808190100"
+const _AndroidName = "445051607071808190100110"
 
-var _AndroidIndex = [...]uint8{0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 21}
+var _AndroidIndex = [...]uint8{0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 21, 24}
 
 func (i Android) String() string {
 	if i >= Android(len(_AndroidIndex)-1) {
@@ -19,7 +19,7 @@ func (i Android) String() string {
 	return _AndroidName[_AndroidIndex[i]:_AndroidIndex[i+1]]
 }
 
-var _AndroidValues = []Android{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+var _AndroidValues = []Android{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 
 var _AndroidNameToValueMap = map[string]Android{
 	_AndroidName[0:2]:   0,
@@ -32,6 +32,7 @@ var _AndroidNameToValueMap = map[string]Android{
 	_AndroidName[14:16]: 7,
 	_AndroidName[16:18]: 8,
 	_AndroidName[18:21]: 9,
+	_AndroidName[21:24]: 10,
 }
 
 // AndroidString retrieves an enum value from the enum constants string name.

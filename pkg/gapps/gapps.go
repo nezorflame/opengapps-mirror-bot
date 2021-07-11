@@ -1,3 +1,7 @@
+//go:generate enumer -type=Android -json -transform=snake -trimprefix=Android
+//go:generate enumer -type=Platform -json -transform=snake -trimprefix=Platform
+//go:generate enumer -type=Variant -json -transform=snake -trimprefix=Variant
+
 package gapps
 
 import (
@@ -30,6 +34,7 @@ const (
 	Android81
 	Android90
 	Android100
+	Android110
 )
 
 // HumanString is required for human-readable Android version with . delimiter

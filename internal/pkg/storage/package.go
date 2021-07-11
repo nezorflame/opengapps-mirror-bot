@@ -11,7 +11,7 @@ import (
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/gapps"
 	"github.com/nezorflame/opengapps-mirror-bot/pkg/net"
 
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v37/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
